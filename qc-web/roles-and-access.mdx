@@ -1,7 +1,7 @@
 ---
-title: "Roles and Project Access in the QC Webapp"
+title: "Understanding Roles and Project Access in the QC Webapp"
 sidebarTitle: "Roles & Access"
-description: "Five roles control what you can see and do in the QC Webapp. Project assignments then gate access to individual projects and QCs."
+description: "Five roles control what you can see and do in the QC Webapp. Project assignments then gate access to individual projects and their QCs."
 ---
 
 Access in the QC Webapp works in two layers. Your **global role** determines what actions you are allowed to perform across the system. **Project assignments** then determine which specific projects and QCs you can see. You need both: a role that permits an action, and an assignment that gives you visibility of the project it applies to.
@@ -27,7 +27,7 @@ When a user (PL or SL) is assigned to a project, the assignment carries one of t
 - **All** — the user can see every QC in the project, including QCs created in the future.
 - **Conditional** — the user can only see specific QCs that have been individually granted to them via a QC-level assignment. New QCs created in the project are not visible by default until explicitly granted.
 
-When a new project is created, the creator and all current Sales Leads are automatically assigned with `scope = all`. An SL's auto-assignment can be removed or narrowed on a per-project basis.
+When a new project is created, the creator and all current Sales Leads are automatically given full access to it. A Sales Lead's auto-assignment can be removed or narrowed to conditional on a per-project basis.
 
 ## Permissions at a glance
 
@@ -37,9 +37,9 @@ When a new project is created, the creator and all current Sales Leads are autom
 | Edit cost rows, create QCs, restore from history | ✅ | ✅ | ✅ | ✅ |
 | Create a project | ✅ | ✅ | ✅ | ✅ |
 | Markup overrides, per-QC rates, publish quotation, manage project members, CRM link/unlink | | ✅ | ✅ | ✅ |
-| MarkupMaster, system defaults, grant roles, global column layouts, view engine rules | | | ✅ | ✅ |
+| MarkupMaster, system defaults, grant roles, global column layouts | | | ✅ | ✅ |
 | Upgrade a QC's pinned calculation engine version | | ✅ | ✅ | ✅ |
-| Permanently delete (move to archive) | ✅ (own QCs; projects with `all` scope) | ✅ | ✅ | ✅ |
+| Permanently delete (move to archive) | ✅ (own QCs; projects with full access) | ✅ | ✅ | ✅ |
 | View archive, unarchive items, destroy for good, full system admin | | | | ✅ |
 
 <Tip>
@@ -64,7 +64,7 @@ When someone leaves Luxurique or no longer needs access to the QC Webapp:
     An Admin navigates to **Admin → Users**, finds the user, and sets their global role to **None**. This takes effect immediately — on their next request to the server they will receive no data.
   </Step>
   <Step title="Disable the Microsoft account (if applicable)">
-    Disabling the user's Luxurique M365 account prevents new sign-ins. However, because the QC Webapp reads the role from the database on every request rather than from the login token, setting the role to None in the app is the most immediate kill switch.
+    Disabling the user's Luxurique M365 account prevents any new sign-ins. However, setting the role to None in the app is the more immediate kill switch — it cuts off data access on the user's very next action, without waiting for their current session to expire.
   </Step>
 </Steps>
 

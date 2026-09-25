@@ -4,18 +4,18 @@ sidebarTitle: "Email Marketing"
 description: "Luxurique uses Vero 2.0 for email marketing, with contact data synced from Supabase and engagement events flowing back to Twenty CRM."
 ---
 
-Luxurique uses **Vero 2.0** for email marketing. Contact profiles are pushed from Supabase to Vero automatically, and engagement events from Vero — opens, clicks, unsubscribes, bounces — are relayed back to Twenty CRM. You manage campaign content, audience targeting, and send timing in the **Vero Cloud dashboard**. Everything else — contact data, subscription state — lives in Twenty CRM.
+Luxurique uses **Vero 2.0** for email marketing. Contact profiles are synced to Vero automatically from Twenty CRM, and engagement events from Vero — opens, clicks, unsubscribes, bounces — are relayed back to Twenty CRM. You manage campaign content, audience targeting, and send timing in the **Vero Cloud dashboard**. Everything else — contact data, subscription state — lives in Twenty CRM.
 
 ## How the integration works
 
-The sync between Twenty CRM and Vero runs in both directions through Supabase, which acts as the bridge.
+The sync between Twenty CRM and Vero runs in both directions automatically.
 
 <CardGroup cols={2}>
   <Card title="Outbound: CRM to Vero" icon="arrow-right">
-    Every five minutes, Supabase compares the current marketing contact list in Twenty CRM against what Vero has on file and pushes any changes — new contacts, updated details, or changed subscription states.
+    Every five minutes, the system compares the current marketing contact list in Twenty CRM against what Vero has on file and pushes any changes — new contacts, updated details, or changed subscription states.
   </Card>
   <Card title="Inbound: Vero to CRM" icon="arrow-left">
-    When a contact opens an email, clicks a link, unsubscribes, bounces, or complains, Vero sends that event to Supabase. Supabase writes the subscription state change back to the contact's record in Twenty CRM and records engagement against the campaign.
+    When a contact opens an email, clicks a link, unsubscribes, bounces, or complains, Vero sends that event back to Twenty CRM. The contact's subscription status is updated on their person record and the engagement is recorded against the campaign.
   </Card>
 </CardGroup>
 
@@ -25,16 +25,16 @@ Twenty CRM is the **single source of truth** for every contact's marketing subsc
 
 | Status | Meaning |
 |---|---|
-| `SUBSCRIBED` | The contact has opted in and can receive marketing email. |
-| `UNSUBSCRIBED` | The contact has opted out. Vero will not send to them. |
-| `BOUNCED` | A hard bounce was recorded. Vero suppresses this address. |
-| `COMPLAINED` | A spam complaint was received. Vero suppresses this address. |
+| **Subscribed** | The contact has opted in and can receive marketing email. |
+| **Unsubscribed** | The contact has opted out. Vero will not send to them. |
+| **Bounced** | A hard bounce was recorded. Vero suppresses this address. |
+| **Complained** | A spam complaint was received. Vero suppresses this address. |
 
 <Warning>
   Do not change a contact's subscription state in the Vero dashboard. Changes made in Vero will be overwritten within five minutes by the next outbound sync from Twenty CRM. Always make subscription changes on the person record in Twenty.
 </Warning>
 
-To opt a contact in, open their record in Twenty CRM at [luxurique.twenty.com](https://luxurique.twenty.com) and set `marketingEmailStatus` to `SUBSCRIBED`. The next outbound push will register them in Vero automatically.
+To opt a contact in, open their record in Twenty CRM at [luxurique.twenty.com](https://luxurique.twenty.com) and set their marketing email status to **Subscribed**. The next outbound push will register them in Vero automatically.
 
 ## What you manage in Vero
 
@@ -42,23 +42,23 @@ You use the **Vero Cloud dashboard** to:
 
 - Create and schedule broadcast campaigns
 - Build journeys (automated message sequences)
-- Define audience segments based on contact traits (for example, `marketing_email_status = SUBSCRIBED`)
+- Define audience segments based on contact traits (for example, filtering to contacts with a **Subscribed** status)
 - Review campaign performance — open rates, click rates, delivery stats
 
 <Tip>
-  Always filter your Vero audience segments on `marketing_email_status = SUBSCRIBED`. This is a second layer of protection that ensures unsubscribed contacts are excluded from sends even in the window before the next outbound sync runs.
+  Always filter your Vero audience segments to include only contacts with a **Subscribed** status. This is a second layer of protection that ensures unsubscribed contacts are excluded from sends even in the window before the next outbound sync runs.
 </Tip>
 
 ## Campaign engagement in Twenty CRM
 
-When a campaign is sent, Vero sends engagement events back through Supabase into Twenty CRM. You can see a contact's engagement history on their person record — which campaigns they received, opened, or clicked. Overall open rates and delivery statistics remain in Vero's own reporting, since Twenty CRM stores per-contact engagement rather than campaign-level totals.
+When a campaign is sent, Vero sends engagement events back into Twenty CRM automatically. You can see a contact's engagement history on their person record — which campaigns they received, opened, or clicked. Overall open rates and delivery statistics remain in Vero's own reporting, since Twenty CRM stores per-contact engagement rather than campaign-level totals.
 
 ## If a contact says they are not receiving emails
 
 If a contact says they should be getting emails but are not:
 
-1. Check their `marketingEmailStatus` in Twenty CRM — it must be `SUBSCRIBED`.
-2. If it is `SUBSCRIBED`, check their profile in the Vero dashboard. The profile may have a suppression that has not yet been corrected by the next weekly full-state sync.
+1. Check their marketing email status in Twenty CRM — it must be set to **Subscribed**.
+2. If it is set to **Subscribed**, check their profile in the Vero dashboard. The profile may have a suppression that has not yet been corrected by the next weekly full-state sync.
 3. Saving the person record in Twenty CRM triggers an immediate re-sync to Vero, which clears most suppression drift within five minutes.
 
 <Note>

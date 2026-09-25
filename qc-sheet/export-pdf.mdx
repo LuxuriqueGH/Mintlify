@@ -1,12 +1,12 @@
 ---
-title: "Export a Branded PDF Quotation from the QC Sheet"
+title: "Export a Branded PDF Quotation from the QC Workbook"
 sidebarTitle: "Export PDF"
 description: "Export a branded, print-ready PDF quotation in A4 or A3 from the QC Sheet ribbon. The file saves automatically to your Desktop, versioned if needed."
 ---
 
 The QC Sheet can produce a polished, client-ready PDF quotation directly from your live costing data. You choose the paper size (A4 or A3) and the brand template (Luxurique, Luxurique Travel, or Liberty), click the export button, and the PDF lands on your Desktop — already named and versioned so you never accidentally overwrite a previous version.
 
-Before the PDF is created, the workbook automatically rebuilds the quotation layout from the latest MainTable data, so what the client sees always matches what you have entered.
+Before the PDF is created, the workbook automatically rebuilds the quotation layout from the latest costing data, so what the client sees always matches what you have entered.
 
 ## Before you export
 
@@ -17,21 +17,21 @@ Make sure the following are in place:
 - Any tabs you want to exclude from the quotation are marked **Excluded** in their Tab Details labels selector.
 
 <Tip>
-If you have been editing the quotation sheet directly and want to force a clean rebuild from the MainTable data before exporting, click **Update Quotation** on the ribbon first. This ensures the staging is fully current before the PDF is generated.
+If you have been editing the quotation sheet directly and want to force a clean rebuild from the costing data before exporting, click **Update Quotation** on the ribbon first. This ensures the layout is fully current before the PDF is generated.
 </Tip>
 
 ## Exporting the PDF
 
 <Steps>
   <Step title="Select the active tab">
-    Navigate to the costing tab (Tab 1, Tab 2, etc.) that corresponds to the quotation set you are exporting. The rebuild will use the active MainTable as its source.
+    Navigate to the costing tab (Tab 1, Tab 2, etc.) that corresponds to the quotation set you are exporting. The rebuild will use the active costing tab as its source.
   </Step>
   <Step title="Choose the brand template">
     In the ribbon's **Quotation** group, open the **Template** dropdown and select the correct brand: **LUX** (Luxurique), **LXT** (Luxurique Travel), or **LBT** (Liberty). The selected brand determines which layout, logo, and disclaimer page appear on the PDF.
   </Step>
   <Step title="Click Export PDF A4 (or A3)">
     Click **Export PDF A4** on the ribbon. For A3, open the split-button menu and choose **Export PDF A3**. The workbook will:
-    1. Check whether the quotation staging is current. If it is stale, it rebuilds automatically.
+    1. Check whether the quotation layout is current. If it is stale, it rebuilds automatically.
     2. Temporarily set the paper size to match your selection.
     3. Force a recalculation to prevent any date or formula rendering artifacts.
     4. Export the quotation sheet to a PDF file on your Desktop.
@@ -66,14 +66,14 @@ The Desktop path is resolved correctly even when your Desktop is redirected to O
 
 Each brand has its own distinct layout on the quotation sheet:
 
-| Brand code | Brand name | Sheet used |
-|---|---|---|
-| **LUX** | Luxurique | QuotationLUX |
-| **LXT** | Luxurique Travel | QuotationLXT |
-| **LBT** | Liberty | QuotationLBT |
+| Brand code | Brand name |
+|---|---|
+| **LUX** | Luxurique |
+| **LXT** | Luxurique Travel |
+| **LBT** | Liberty |
 
 The active brand is remembered between sessions, so the Template dropdown will already be set to your last-used brand when you reopen the workbook.
 
 <Warning>
-If the rebuild fails — for example, because a required named range is missing on the Templates sheet — the export will be cancelled and an error message will describe what is missing. No PDF will be created. Resolve the reported issue and try again.
+If the rebuild fails — for example, because a required layout element is missing from the Templates sheet — the export will be cancelled and an error message will describe what is missing. No PDF will be created. Resolve the reported issue and try again.
 </Warning>

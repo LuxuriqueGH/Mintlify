@@ -1,7 +1,7 @@
 ---
-title: "QC Sheet Ribbon Reference and Keyboard Shortcuts"
+title: "QC Sheet Ribbon Button and Keyboard Shortcut Reference"
 sidebarTitle: "Ribbon Reference"
-description: "A complete reference for every button in the QC Sheet ribbon, organised by group, with notes on how each action behaves and when to use it."
+description: "Complete reference for every button in the QC Sheet Costing ribbon, with descriptions of how each control behaves and when to use it in your workflow."
 ---
 
 The QC Sheet adds a dedicated **Costing** tab to the Excel ribbon. All quotation-building actions — from rebuilding the quotation layout to exporting finished deliverables — live here. The sections below describe every control in the order they appear on the ribbon, grouped by function.
@@ -25,12 +25,12 @@ These controls build and export the client-facing quotation. Work through them f
 
 ## Tab management group
 
-These controls add and remove quote sets (costing tab + MainTable pairs).
+These controls add and remove quote sets (a costing tab and its associated data).
 
 | Button / Control | Action | Notes |
 |---|---|---|
-| **Add Tab** | Creates the next available costing tab (`Tab N`), its MainTable, and its label configuration | Tabs are numbered sequentially. The new tab is ready to use immediately; populate it with cost lines before running **Update Quotation**. |
-| **Delete Quote Set** | Permanently removes a costing tab and its MainTable from the workbook | You must type `DELETE <sheetname>` exactly to confirm. A final audit snapshot of all rows is written to the Audit Log before deletion. This action cannot be undone. |
+| **Add Tab** | Creates the next available costing tab and its associated data tables | Tabs are numbered sequentially. The new tab is ready to use immediately; populate it with cost lines before running **Update Quotation**. |
+| **Delete Quote Set** | Permanently removes a costing tab and all its data from the workbook | You must type `DELETE <sheetname>` exactly to confirm. A final audit snapshot of all rows is written to the Audit Log before deletion. This action cannot be undone. |
 
 <Warning>
   **Delete Quote Set** is irreversible. The tab's data is recorded in the Audit Log, but the sheet itself and its cost lines are gone permanently. Make sure you have exported or saved any outputs you need before deleting.

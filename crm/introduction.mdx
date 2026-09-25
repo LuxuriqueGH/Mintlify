@@ -1,10 +1,10 @@
 ---
-title: "Luxurique CRM & Integration Stack Overview"
+title: "Luxurique CRM & Integration Stack: All Tools Overview"
 sidebarTitle: "Introduction"
-description: "Seven connected tools power the Luxurique CRM cluster — from email triage to BI dashboards. Learn what each tool does and how data flows."
+description: "Seven connected tools power the Luxurique CRM stack — from automated email triage to BI dashboards. Learn what each tool does and how data flows."
 ---
 
-Luxurique runs on a cluster of seven integrated tools. At the centre sits **Twenty CRM**, where every client, supplier, and deal record lives. Around it, n8n automates email triage, Supabase captures every record change for analytics, and Preset.io (Superset) surfaces that data as business-intelligence dashboards. Vero handles outbound email marketing, Asana manages project tasks, and SupplierDB was used to migrate supplier records from SharePoint into Twenty. You interact with most of this stack through Twenty CRM and Slack — the automation runs silently in the background.
+Luxurique runs on a connected set of seven tools. At the centre sits **Twenty CRM**, where every client, supplier, and deal record lives. Around it, n8n automates email triage and record creation, an analytics layer captures every record change, and Preset.io (Superset) surfaces that data as business-intelligence dashboards. Vero handles outbound email marketing, Asana manages project tasks, and SupplierDB was used to migrate supplier records from SharePoint into Twenty. You interact with most of this stack through Twenty CRM and Slack — the automation runs silently in the background.
 
 ## The seven tools at a glance
 
@@ -37,15 +37,15 @@ Luxurique runs on a cluster of seven integrated tools. At the centre sits **Twen
 Data enters the cluster through two main paths: incoming emails and direct edits in Twenty CRM.
 
 **Email path:**
-1. An email arrives in the Luxurique shared inbox and is copied to the M365 proxy inbox.
-2. **n8n** reads the proxy inbox, classifies the email, and extracts CRM fields (contact name, company, deal details).
-3. n8n writes Person, Company, and Deal records into **Twenty CRM** via GraphQL upsert.
-4. Twenty fires a webhook for every record create or update.
-5. **Supabase** receives those webhooks and appends each change to an immutable activity log, then derives analytics views.
-6. **Preset.io** reads the aggregate analytics from Supabase and updates the dashboards.
+1. An email arrives in the Luxurique shared inbox and is copied to a dedicated automation inbox.
+2. **n8n** reads that inbox, classifies the email, and extracts CRM fields (contact name, company, deal details).
+3. n8n creates Person, Company, and Deal records in **Twenty CRM** automatically.
+4. Twenty fires a notification for every record create or update.
+5. The **analytics layer** receives those notifications, appends each change to an immutable activity log, and derives analytics views.
+6. **Preset.io** reads the aggregate analytics and updates the dashboards.
 
 **Manual path:**
-Any record created or edited directly in Twenty CRM follows the same webhook → Supabase → Preset chain from step 4 onward.
+Any record created or edited directly in Twenty CRM follows the same notification → analytics → Preset chain from step 4 onward.
 
 <Note>
   You do not need to enter most inbound leads manually. They appear in Twenty CRM within minutes of the email arriving. If a record looks wrong, edit it directly in Twenty — automation will not overwrite your changes.

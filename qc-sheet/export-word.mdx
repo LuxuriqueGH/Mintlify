@@ -1,5 +1,5 @@
 ---
-title: "Export a Branded Word Document from the QC Sheet"
+title: "Export a Branded Word Document from the QC Workbook"
 sidebarTitle: "Export Word"
 description: "Export a branded Word (.docx) quotation from the QC Sheet ribbon. Each brand uses its own embedded .docx template; the file saves to your Desktop."
 ---
@@ -12,8 +12,8 @@ Word stays open after the export, giving you immediate access to review or refin
 
 Check the following before you begin:
 
-- Microsoft Word must be installed on your computer. The export uses Word directly to build the document.
-- A Word template must be embedded for the active brand. If no template has been embedded yet, see [Embedding a Word template](#embedding-a-word-template) below.
+- **Microsoft Word must be installed** on your computer. The export uses Word directly to build the document; it will not work without a local Word installation.
+- **A Word template must be embedded for the active brand.** Each brand (Luxurique, Luxurique Travel, and Liberty) requires its own template embedded in the workbook. If no template has been embedded yet for the brand you want to use, see [Embedding a Word template](#embedding-a-word-template) below.
 - The workbook must be saved to disk before running the export.
 - The **Overview** sheet has current project fields — client name, dates, PAX count, and totals — as these are written into the Word document's static fields automatically.
 
@@ -25,14 +25,14 @@ You do not need to run a manual rebuild before exporting. The export checks whet
 
 <Steps>
   <Step title="Select the active tab">
-    Navigate to the costing tab that corresponds to the quotation set you are exporting. The export builds the Word document from the quotation tables for the active MainTable.
+    Navigate to the costing tab that corresponds to the quotation set you are exporting. The export builds the Word document from the quotation tables for the active costing tab.
   </Step>
   <Step title="Choose the brand template">
     In the ribbon's **Quotation** group, open the **Template** dropdown and select the correct brand: **LUX** (Luxurique), **LXT** (Luxurique Travel), or **LBT** (Liberty). The export uses the Word template embedded for that brand.
   </Step>
   <Step title="Click Export Word">
     Click **Export Word** on the ribbon. The workbook will:
-    1. Check whether the quotation staging is current and rebuild if needed.
+    1. Check whether the quotation layout is current and rebuild if needed.
     2. Extract the embedded Word template for the active brand to a temporary file.
     3. Open Word (or attach to a running instance) and load the template.
     4. Populate the static fields — project name, client name, dates, PAX, totals, and fees.
@@ -83,8 +83,8 @@ If no template has been embedded for the active brand, the export will prompt yo
   <Step title="Select the correct brand">
     In the ribbon's **Quotation** group, open the **Template** dropdown and select the brand whose template you want to embed.
   </Step>
-  <Step title="Click DEV — Import Template">
-    Click the **DEV — Import Template** button on the ribbon. A file picker opens.
+  <Step title="Click Import Template on the ribbon">
+    Click the **Import Template** button on the ribbon. A file picker opens.
   </Step>
   <Step title="Select the .docx file">
     Browse to the Word template `.docx` file for this brand and select it. The template is embedded into the workbook and stored per-brand. Only the active brand's template is replaced; other brands are untouched.
@@ -95,7 +95,7 @@ If no template has been embedded for the active brand, the export will prompt yo
 </Steps>
 
 <Warning>
-The Word export requires Microsoft Word to be installed and accessible. If Word is not available, the export will fail with an error. The export also leaves Word running after completion — if you had Word open with other documents, those documents are not affected.
+The Word export requires Microsoft Word to be installed and accessible on your computer. If Word is not available, the export will fail with an error. The export also leaves Word running after completion — if you had Word open with other documents, those documents are not affected.
 </Warning>
 
 <Note>

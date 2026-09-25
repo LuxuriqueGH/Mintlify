@@ -1,7 +1,7 @@
 ---
-title: "Add and Edit Cost Line Items in the QC Webapp"
+title: "Add, Edit, and Configure Cost Line Items in the QC Webapp"
 sidebarTitle: "Line Items"
-description: "Learn how to add, edit, and configure every field on a cost line item — including Cost Basis, quantities, and grouped-row behaviour — in the QC Webapp."
+description: "How to add, edit, and configure every field on a cost line item — Cost Basis, quantities, and grouped-row behaviour — in the QC Webapp."
 ---
 
 A line item is a single cost entry in a QC — the fundamental unit of costing work. Each row you add to a tab's section represents one service, supplier charge, or expense. Understanding the fields available on a line item, and how the app determines which cost value is active, will help you build accurate quotations quickly.
@@ -45,7 +45,7 @@ From there, markup, margin, and commission are applied in sequence to reach the 
 
 ## Grouped rows
 
-When a row belongs to a group, the **group** is the priced unit — not the individual row. Grouped rows contribute their cost to the group total, and the group's markup, quantities, and overrides control the final price. You cannot set a concession, `override_marked_up_cost`, `skip_margin`, or `skip_commission` directly on a grouped row; those controls live on the group.
+When a row belongs to a group, the **group** is the priced unit — not the individual row. Grouped rows contribute their cost to the group total, and the group's markup, quantities, and overrides control the final price. You cannot set a concession, a marked-up cost override, or skip-margin/skip-commission flags directly on a grouped row; those controls live on the group.
 
 <Tip>
   To move a row into or out of a group, use the row menu. If the target group carries a pricing override and the QC's **Protect overrides** setting is on, you will need SL+ access to complete the move. See [Pricing Overrides](/qc-web/pricing-overrides) for details.

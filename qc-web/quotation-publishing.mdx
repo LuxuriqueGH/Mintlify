@@ -1,5 +1,5 @@
 ---
-title: "Publish a Quotation to a Client in the QC Webapp"
+title: "How to Publish a Quotation to a Client in the QC Webapp"
 sidebarTitle: "Publishing"
 description: "Learn what publishing a QC means, who can do it, the pre-publish checks the app runs, and what happens to the quotation record after publishing."
 ---
@@ -20,14 +20,14 @@ Before the system completes a publish, it runs a set of automatic checks. If any
 
 ### Concession validation
 
-Every **concession** on the QC is re-checked at publish time. A concession is considered **stranded** if its value exceeds the gross line total of the priced unit it belongs to (that is, the concession would push the line's total price below zero). Publishing is **rejected** while any stranded concession exists.
+Every **concession** on the QC is re-checked at publish time. Publishing is **blocked** if any concession on a line item or group exceeds that item's total price — in other words, the concession cannot be larger than what the client is being charged for that line.
 
 <Steps>
   <Step title="Find the flagged line">
-    The publish error message identifies which priced unit (group or ungrouped row) has the stranded concession.
+    The publish error message identifies which line item or group has the oversized concession.
   </Step>
   <Step title="Resolve the concession">
-    Either reduce the concession amount so it no longer exceeds the gross line total, or remove the concession entirely if it is no longer applicable. This requires SL+ access.
+    Either reduce the concession amount so it no longer exceeds the line's total price, or remove the concession entirely if it is no longer applicable. This requires Sales Lead access or above.
   </Step>
   <Step title="Retry publishing">
     Once all concessions are within bounds, attempt to publish again.
@@ -53,7 +53,7 @@ When a publish succeeds, the following happens in a single, all-or-nothing opera
     A published export entry is added to the QC's export history, showing who published it, when, and the paper size used.
   </Card>
   <Card title="CRM push triggered" icon="arrow-up-right-from-square">
-    The QC's financial totals are pushed to the linked CRM opportunity, if one is linked to the project.
+    The QC's financial totals are pushed to the linked CRM deal, if one is linked to the project.
   </Card>
 </CardGroup>
 

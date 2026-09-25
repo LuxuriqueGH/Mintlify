@@ -4,7 +4,7 @@ sidebarTitle: "Superset Dashboards"
 description: "View deal pipeline, stage transitions, win rates, and funnel analytics in Preset.io — Luxurique's hosted Apache Superset BI workspace."
 ---
 
-Luxurique uses **Preset.io** — a hosted, managed version of Apache Superset — as its sole business intelligence tool. Preset.io connects to a dedicated analytics schema in Supabase and gives you aggregate reporting across the entire deal pipeline. You access Preset.io through the Luxurique Preset workspace. If you do not yet have access, contact a Supervisor to request it.
+Luxurique uses **Preset.io** — a hosted, managed version of Apache Superset — as its sole business intelligence tool. Preset.io draws from the analytics data captured from Twenty CRM activity and gives you aggregate reporting across the entire deal pipeline. You access Preset.io through the Luxurique Preset workspace. If you do not yet have access, contact a Supervisor to request it.
 
 ## What the dashboards show
 
@@ -27,7 +27,7 @@ The Preset.io dashboards draw from aggregate analytics functions built on top of
 
 ## What you can and cannot see
 
-Preset.io connects to Supabase using a read-only, least-privilege login (`preset_ro`). That login can only call aggregate-only functions in the `analytics` schema — it physically cannot read per-deal rows, individual deal names, margins, or costs. You will always see summary numbers, never raw CRM records.
+Preset.io connects to the analytics data using a read-only, restricted connection that can only access aggregate summary functions — it physically cannot read per-deal rows, individual deal names, margins, or costs. You will always see summary numbers, never raw CRM records.
 
 <Note>
   Individual deal margins, contract amounts, and cost data are **not** exposed in Preset.io. If you need deal-level figures, open the record directly in Twenty CRM at [luxurique.twenty.com](https://luxurique.twenty.com).

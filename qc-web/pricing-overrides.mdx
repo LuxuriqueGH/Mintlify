@@ -11,50 +11,50 @@ The standard pricing chain — cost → markup → margin → commission → uni
 You can apply overrides to an individual ungrouped line item from the **row side panel**. Open the side panel via the row-menu icon at the left of any row.
 
 <CardGroup cols={2}>
-  <Card title="override_markup" icon="percent">
-    Replaces the standard markup rate for this row. The QC rate table rate becomes **inert** (stored but inactive) while the override is in force. An explicit value of **0** means 0% markup — no markup is applied. Clear the field to restore the standard rate.
+  <Card title="Markup Rate Override" icon="percent">
+    Replaces the standard markup rate for this row. The QC rate table rate becomes inactive while the override is in force. An explicit value of **0** means 0% markup — no markup is applied. Clear the field to restore the standard rate.
   </Card>
-  <Card title="override_marked_up_cost" icon="circle-dollar-to-slot">
+  <Card title="Marked-Up Cost Override" icon="circle-dollar-to-slot">
     Sets the row's marked-up cost directly, bypassing both the cost value and the markup step. Margin and commission still apply on top of this figure unless the skip flags are also set. Must be ≥ 0.
   </Card>
 </CardGroup>
 
 <Warning>
-  `override_markup` and `override_marked_up_cost` are **mutually exclusive** on the same row. Setting one while the other is already active is rejected. Clear the existing override before applying the other.
+  You cannot set both a **markup rate override** and a **marked-up cost override** on the same row — choose one. Clear the existing override before applying the other.
 </Warning>
 
 ### Skip flags
 
-Two boolean flags let you remove margin or commission from the pricing chain for a specific row:
+Two flags let you remove margin or commission from the pricing chain for a specific row:
 
 | Flag | Effect |
 |------|--------|
-| **skip_margin** | Margin is not applied when calculating the unit price for this row. |
-| **skip_commission** | Commission is not applied when calculating the unit price for this row. |
+| **Skip margin** | Margin is not applied when calculating the unit price for this row. |
+| **Skip commission** | Commission is not applied when calculating the unit price for this row. |
 
 Both flags are SL+ only and can be set independently. They apply after markup and before the ¥100 rounding step.
 
 ## Group-level overrides
 
-When a row belongs to a group, the **group** is the priced unit. Row-level price overrides (`override_marked_up_cost`, `skip_margin`, `skip_commission`) are not available on grouped rows — they belong to the group instead. Open the **group side panel** from the group header row's menu to access these fields.
+When a row belongs to a group, the **group** is the priced unit. Row-level price overrides (marked-up cost override, skip margin, skip commission) are not available on grouped rows — they belong to the group instead. Open the **group side panel** from the group header row's menu to access these fields.
 
 <CardGroup cols={2}>
-  <Card title="override_markup (group)" icon="percent">
-    Applies a single markup rate to the group's total cost (the sum of active cost × quantities across all active member rows), replacing each member's individual markup. Member markups become inert while the group override is active. For category/label breakdown views, the marked-up cost is allocated back to members proportionally to their cost contribution (equal split if total cost is zero).
+  <Card title="Markup Rate Override (group)" icon="percent">
+    Applies a single markup rate to the group's total cost (the sum of active cost × quantities across all active member rows), replacing each member's individual markup. Member markups become inactive while the group override is in force. For category/label breakdown views, the marked-up cost is allocated back to members proportionally to their cost contribution (equal split if total cost is zero).
   </Card>
-  <Card title="override_marked_up_cost (group)" icon="circle-dollar-to-slot">
-    Sets the group's marked-up cost directly. The same mutual-exclusivity rule applies: this cannot be set at the same time as `override_markup` on the group.
+  <Card title="Marked-Up Cost Override (group)" icon="circle-dollar-to-slot">
+    Sets the group's marked-up cost directly. The same mutual-exclusivity rule applies: you cannot set both a markup rate override and a marked-up cost override on the same group — choose one.
   </Card>
 </CardGroup>
 
 <Warning>
-  `override_markup` and `override_marked_up_cost` are **mutually exclusive** on the same group. Attempting to set one while the other is active is rejected.
+  You cannot set both a **markup rate override** and a **marked-up cost override** on the same group — choose one. Clear the existing override before applying the other.
 </Warning>
 
-The **skip_margin** and **skip_commission** flags are also available at the group level, with the same effect as at the row level.
+The **Skip margin** and **Skip commission** flags are also available at the group level, with the same effect as at the row level.
 
 <Note>
-  When a row's group carries a pricing override, the row's own `override_markup` field becomes **inert** — it is stored safely but has no effect until the row is removed from the group or the group's override is cleared.
+  When a row's group carries a pricing override, the row's own markup rate override becomes **inactive** — it is stored safely but has no effect until the row is removed from the group or the group's override is cleared.
 </Note>
 
 ## Protect overrides
@@ -63,11 +63,11 @@ Each QC has a **Protect overrides** setting, which is **on by default**. When th
 
 You can find this setting in the QC header panel. SL+ users can toggle it on or off for the entire QC.
 
-Additionally, each group has its own **override_protected** flag that can override the QC setting for that group specifically:
+Additionally, each group has its own **Override protection** flag that can override the QC setting for that group specifically:
 
 | Group flag state | Behaviour |
 |-----------------|-----------|
-| **Blank (null)** | The group follows the QC's Protect overrides setting. |
+| **Not set** | The group follows the QC's Protect overrides setting. |
 | **On** | Membership changes to this group always require SL+, regardless of the QC setting. |
 | **Off** | Membership changes to this group are unrestricted, regardless of the QC setting. |
 
@@ -92,9 +92,9 @@ To restore standard pricing on a row or group:
     Click the row-menu or group-menu icon to open the side panel for the item you want to restore.
   </Step>
   <Step title="Locate the override field">
-    Find the `override_markup` or `override_marked_up_cost` field that is currently set.
+    Find the markup rate override or marked-up cost override field that is currently set.
   </Step>
   <Step title="Clear the field">
-    Delete the value and save. The row or group immediately resumes calculating from the standard chain — the QC rate table rate is restored, and the markup cache is updated automatically.
+    Delete the value and save. The row or group immediately resumes calculating from the standard chain — the QC rate table rate is restored and the row is repriced automatically.
   </Step>
 </Steps>

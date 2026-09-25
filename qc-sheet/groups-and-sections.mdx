@@ -1,7 +1,7 @@
 ---
-title: "Group and Section Cost Items in the QC Sheet"
+title: "Using Groups and Sections to Organise Your Quote Set"
 sidebarTitle: "Groups & Sections"
-description: "Sections are titled headings that organise your quote set. Groups link related rows that always move and sort together as a single unit."
+description: "Sections are titled headings that organise your quote set into logical parts. Groups link related rows so they always move and sort together as one unit."
 ---
 
 The QC Sheet gives you two levels of organisation above the individual line item: **sections** and **groups**. Sections are titled headings that divide your quote set into logical parts (Day 1, Ground Transport, Pre-Tour, etc.). Groups are clusters of related rows that always travel together when you sort or reorder the table.
@@ -10,22 +10,22 @@ Understanding the difference between the two is key to keeping large quote sets 
 
 ## Sections
 
-A **section** is a user-defined heading that groups a set of rows under a title. Every active MainTable always has at least one section — the QC Sheet enforces this as an invariant, so you cannot accidentally end up with a table that has no section headings.
+A **section** is a user-defined heading that groups a set of rows under a title. Every active quote-set tab always has at least one section — the QC Sheet enforces this, so you cannot accidentally end up with a table that has no section headings.
 
 ### How sections appear in the table
 
-Each section starts with a **TITLE row** — a special header row that displays the section name. All rows between one TITLE row and the next belong to that section. When you sort the table, rows stay within their own section (provided the **Maintain Section Order** toggle is on — see below).
+Each section starts with a **title row** — a special header row that displays the section name. All rows between one title row and the next belong to that section. When you sort the table, rows stay within their own section (provided the **Maintain Section Order** toggle is on — see below).
 
 ### Creating a section
 
 1. Click any data row (or select a range of rows) where you want the new section to begin.
 2. In the **Luxurique ribbon**, click **Create Section**.
-3. A new TITLE row is inserted above your selection, and the selected rows move into the new section.
+3. A new title row is inserted above your selection, and the selected rows move into the new section.
 
-The QC Sheet names the new section "Section N" automatically. Click the TITLE row's **Item** cell to rename it to something meaningful (e.g. "Day 1 – Arrivals", "Shore Excursions").
+The QC Sheet names the new section "Section N" automatically. Click the title row's **Item** cell to rename it to something meaningful (e.g. "Day 1 – Arrivals", "Shore Excursions").
 
 <Tip>
-When you click a single row inside an existing section, the "Create Section" action adopts all the rows below your click point (within the same parent section) into the new section. If you select multiple rows first, only those rows move into the new section — the parent section retains the rest. This lets you carve out a sub-section precisely.
+When you click a single row inside an existing section, the **Create Section** action adopts all the rows below your click point (within the same parent section) into the new section. If you select multiple rows first, only those rows move into the new section — the parent section retains the rest. This lets you carve out a sub-section precisely.
 </Tip>
 
 ### Dissolving a section
@@ -33,10 +33,10 @@ When you click a single row inside an existing section, the "Create Section" act
 To remove a section heading and merge its rows into an adjacent section:
 
 1. Select any row within the section you want to dissolve.
-2. In the ribbon, click **Remove Section** (or equivalent).
-3. Confirm the action in the dialog.
+2. In the ribbon, click **Remove Section**.
+3. Confirm the action in the dialog. The dialog tells you which neighbouring section the rows will be merged into.
 
-The TITLE row is deleted and all rows are merged into the nearest neighbouring section. You cannot dissolve a section if it is the last user section in the table — the QC Sheet will block the action and prompt you to keep at least one section.
+The title row is deleted and all rows are merged into the nearest neighbouring section. You cannot dissolve a section if it is the last user section in the table — the QC Sheet will block the action and prompt you to keep at least one section.
 
 <Warning>
 You cannot dissolve the **Cancelled** section. That section is managed automatically by the QC Sheet and cannot be removed or reorganised manually.
@@ -47,7 +47,7 @@ You cannot dissolve the **Cancelled** section. That section is managed automatic
 The **Maintain Section Order** toggle in the ribbon controls what happens when you sort the table:
 
 - **ON (default):** Rows stay within their section when sorted. Sorting by date, for example, reorders rows within each section without mixing items from different sections together.
-- **OFF:** All rows — including TITLE rows — can sort freely across the entire table. Sections may interleave. Use this mode only if you intentionally want to flatten the section structure.
+- **OFF:** All rows can sort freely across the entire table. Sections may interleave. Use this mode only if you intentionally want to flatten the section structure.
 
 <Note>
 Leave Maintain Section Order **on** for day-to-day quoting work. Turning it off is an advanced option intended for specific reordering tasks.
@@ -61,21 +61,21 @@ A **group** links two or more related rows into a single unit. Grouped rows alwa
 
 Use groups when multiple line items represent different components of the same service and must always appear together in sequence. For example:
 
-- Three transfers that together make up an airport shuttle run ("1 of 3 pumps")
+- Three transfers that together make up an airport shuttle run
 - An accommodation row paired with a compulsory meal supplement
 
-The Group column (column A) displays the group membership in plain language, such as **"1 of 3"**, **"2 of 3"**, **"3 of 3"** — making it immediately obvious which rows belong together.
+The **Group** column (column A) displays the group membership in plain language, such as **"1 of 3"**, **"2 of 3"**, **"3 of 3"** — making it immediately obvious which rows belong together and how many rows are in the group.
 
 ### Grouping rows
 
-1. Activate the rows you want to group (they must each have an Item ID — i.e. the Include checkbox must be ticked).
+1. Activate the rows you want to group (each must have an Item ID — i.e. the Include checkbox must be ticked).
 2. Select all the rows you want in the group.
 3. In the ribbon, click **Group Rows**.
 
-The QC Sheet assigns all selected rows the same **GroupID** and gives each a **GroupRole** (1, 2, 3…) reflecting their sequence within the group. The Group column text updates to "X of N" format automatically.
+The QC Sheet links all selected rows together and numbers each one in sequence within the group. The Group column text updates to "X of N" format automatically.
 
 <Tip>
-If you select rows that already belong to a group plus some ungrouped rows, the QC Sheet will merge the ungrouped rows into the existing group rather than creating a second group. This "assimilation" behaviour means you can build up a group incrementally.
+If you select rows that already belong to a group plus some ungrouped rows, the QC Sheet will merge the ungrouped rows into the existing group rather than creating a second group. This means you can build up a group incrementally by adding rows one at a time.
 </Tip>
 
 ### Ungrouping rows
@@ -83,7 +83,7 @@ If you select rows that already belong to a group plus some ungrouped rows, the 
 1. Select the rows you want to ungroup.
 2. In the ribbon, click **Ungroup Rows**.
 
-Each row becomes its own "1 of 1" group with a new GroupID. The rows remain activated and in the table — they just no longer move together as a unit.
+Each row becomes independent. The rows remain activated and in the table — they just no longer move together as a unit.
 
 ### Moving groups
 

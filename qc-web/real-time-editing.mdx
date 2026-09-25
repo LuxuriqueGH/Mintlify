@@ -1,5 +1,5 @@
 ---
-title: "Collaborate in Real Time on QC Webapp Quotations"
+title: "Collaborate in Real Time on Quotations in the QC Webapp"
 sidebarTitle: "Real-Time Editing"
 description: "See colleagues' changes appear within ~1 second and avoid overwrite conflicts with field-level detection and presence badges in the QC Webapp."
 ---
@@ -8,7 +8,7 @@ The QC Webapp is built for simultaneous co-editing. Any number of team members c
 
 ## How live sync works
 
-When you open a QC, the app subscribes to a live channel for that quotation. Whenever a colleague saves a cell edit, inserts or deletes a row, or makes any structural change, the update is pushed to every other open session and applied automatically. You do not need to do anything to receive updates — the grid stays current as long as you are connected.
+When you open a QC, the app connects to a live update feed for that quotation. Whenever a colleague saves a cell edit, inserts or deletes a row, or makes any structural change, the update is delivered to every other open session and applied automatically. You do not need to do anything to receive updates — the grid stays current as long as you are connected.
 
 ## Presence badges
 
@@ -28,7 +28,7 @@ When you save a cell edit, the app checks that the field's value on the server s
 
 ### Structural change conflicts
 
-Structural operations — moving rows, inserting, deleting, grouping — use a row-level token (`updated_at`) for conflict detection. If the row was modified by a colleague since you loaded it, your structural change is **rejected** with a notification, and the page reloads to show you the current state of the QC before you try again.
+Structural operations — moving rows, inserting, deleting, grouping — use a row-level check for conflict detection. If the row was modified by a colleague since you loaded it, your structural change is **rejected** with a notification, and the page reloads to show you the current state of the QC before you try again.
 
 <Warning>
   Because structural conflict detection is row-level rather than field-level, two people making different structural changes to the same row at the same time will produce a conflict even if those changes touch different aspects of the row. This is by design — structural operations are harder to merge automatically, and a conflict notification is safer than a silent merge.

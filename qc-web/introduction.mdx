@@ -6,7 +6,7 @@ description: "The QC Webapp is Luxurique's modern replacement for the Excel QC S
 
 The QC Webapp is the official replacement for the Excel-based Quotation and Costing Sheet (QC Sheet). It lives at **[qc.luxurique.com](https://qc.luxurique.com)** and brings your entire costing workflow into a clean browser interface — no more working from per-user Excel copies or losing changes when a workbook freezes.
 
-The app is built on a React front end backed by a Supabase (PostgreSQL) database, with sign-in handled by your existing Luxurique Microsoft 365 account. Every calculation — markup, margin, commission, fees, and grand totals — runs in the database, so the numbers you see are always up to date and consistent for every user viewing the same QC at the same time.
+Sign in with your existing Luxurique Microsoft 365 account — there is no separate password. Every calculation — markup, margin, commission, fees, and grand totals — is always up to date and consistent for every user viewing the same QC at the same time.
 
 ## What's new compared to the Excel sheet
 
@@ -16,7 +16,7 @@ The app is built on a React front end backed by a Supabase (PostgreSQL) database
 | Change history | ❌ No audit trail | ✅ Full per-field history, forever |
 | Undo / Redo | ❌ Excel only | ✅ Per-user Ctrl+Z across all operations |
 | Access control | ❌ File-based | ✅ Role- and project-based permissions |
-| CRM integration | Optional n8n proxy | ✅ Direct Twenty CRM link and push |
+| CRM integration | Manual / disconnected | ✅ Direct Twenty CRM link and push |
 | Deployment | Shared file on SharePoint | ✅ Always-on at qc.luxurique.com |
 
 <Note>

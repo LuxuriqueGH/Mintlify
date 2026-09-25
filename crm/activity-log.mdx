@@ -1,14 +1,14 @@
 ---
 title: "CRM Activity Log: Every Deal Change, Captured Automatically"
 sidebarTitle: "Activity Log"
-description: "Every create, update, and delete in Twenty CRM is automatically captured in Supabase and powers the Preset.io analytics dashboards."
+description: "Every create, update, and delete in Twenty CRM is automatically captured in the activity log and powers the Preset.io analytics dashboards."
 ---
 
 Every time you or an automated workflow creates, updates, or deletes a record in Twenty CRM, that change is captured automatically in the Supabase activity log. You do not need to do anything to trigger this — it runs silently in the background on every CRM operation.
 
 ## How it works
 
-When a record changes in Twenty CRM, Twenty sends a webhook to a Supabase edge function. That function verifies the request, checks for duplicates, and appends a new row to the activity log. The log stores a complete snapshot of the record as it was after the change, along with metadata about what fields changed and when.
+When a record changes in Twenty CRM, Twenty sends an automatic notification to the analytics layer. That notification is verified, checked for duplicates, and used to append a new entry to the activity log. The log stores a complete snapshot of the record as it was after the change, along with metadata about what fields changed and when.
 
 <CardGroup cols={2}>
   <Card title="Append-Only" icon="lock">
@@ -30,7 +30,7 @@ When a record changes in Twenty CRM, Twenty sends a webhook to a Supabase edge f
 You do not interact with the activity log directly. There is no interface for browsing it or editing it — and no way to delete entries. If you want to review deal history, open the record in Twenty CRM at [luxurique.twenty.com](https://luxurique.twenty.com). The CRM timeline shows the activity sequence for any deal, person, or company.
 
 <Note>
-  The activity log is the source of truth for all analytics. It is append-only by design and enforced at the database level — not just by convention.
+  The activity log is the source of truth for all analytics. It is append-only by design — entries are never edited or deleted.
 </Note>
 
 ## What gets captured

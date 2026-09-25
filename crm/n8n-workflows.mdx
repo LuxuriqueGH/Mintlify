@@ -1,5 +1,5 @@
 ---
-title: "n8n Automation Workflows in the Luxurique Stack"
+title: "n8n Email Automation Workflows in the Luxurique CRM"
 sidebarTitle: "n8n Workflows"
 description: "n8n is the automation backbone that reads the M365 proxy inbox, classifies emails, and writes CRM records into Twenty. Runs on n8n Cloud."
 ---
@@ -23,7 +23,7 @@ The workflow steps, in order:
     Three parallel extraction calls pull structured data from the email: one for the **Person** (contact details), one for the **Company** (organisation), and one for the **Deal** (trip details, destinations, dates, passenger count).
   </Step>
   <Step title="Upsert records in Twenty CRM">
-    n8n writes the extracted data to Twenty CRM via GraphQL — creating a Person, Company, and Deal if they do not already exist. Existing records matched by email address or company domain are left untouched (automation never overwrites human edits).
+    n8n writes the extracted data to Twenty CRM — creating a Person, Company, and Deal if they do not already exist. Existing records matched by email address or company domain are left untouched (automation never overwrites human edits).
   </Step>
   <Step title="Send Slack notifications">
     A notification goes to **`#sales-new-deals`** for each new deal created, and to **`#pipeline-alerts`** for uncertain emails that need human review.
@@ -32,7 +32,7 @@ The workflow steps, in order:
 
 ## QC Webapp integration
 
-n8n also handles the push of quotation data back to Twenty when you export a quotation from the QC Webapp. When you export a completed quotation for a project that is linked to a Twenty deal, a Supabase edge function triggers n8n to update the deal with the grand total, gross cost, PAX count, and travel dates.
+n8n also handles the push of quotation data back to Twenty when you export a quotation from the QC Webapp. When you export a completed quotation for a project that is linked to a Twenty deal, the system automatically updates the deal with the grand total, gross cost, PAX count, and travel dates.
 
 This means your deal records in Twenty stay current with your latest costing figures automatically — no copy-paste required.
 

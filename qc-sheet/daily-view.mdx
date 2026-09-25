@@ -1,31 +1,31 @@
 ---
-title: "DailyView: See All Cost Items Across Every Tab"
+title: "Daily View: All Cost Items Across Every Tab at a Glance"
 sidebarTitle: "Daily View"
-description: "DailyView aggregates every active cost item from all MainTable tabs into one read-only sheet, with a Source column showing its origin tab."
+description: "Daily View aggregates every active cost item from all costing tabs into one read-only sheet, with a Source column showing which tab each row came from."
 ---
 
-DailyView is a single aggregated sheet that pulls every active cost row from all your MainTable tabs — Tab 1, Tab 2, and so on — into one place. Instead of switching between tabs to track down an item, you can scan, filter, and sort across your entire quotation at a glance. The sheet is read-only by default, but it also supports inline editing that writes changes directly back to the source tab.
+Daily View is a single aggregated sheet that pulls every active cost row from all your costing tabs — Tab 1, Tab 2, and so on — into one place. Instead of switching between tabs to track down an item, you can scan, filter, and sort across your entire quotation at a glance. The sheet also supports inline editing that writes changes directly back to the source tab.
 
-## What you see on DailyView
+## What you see on Daily View
 
-DailyView displays the **DailyTable**, which mirrors the column structure of a standard MainTable with one key addition: a **Source** column (column D) that shows the name of the tab each row came from (for example, "Tab 1" or "Tab 3"). This lets you immediately identify which costing sheet owns any given item.
+Daily View displays the **Daily Table**, which mirrors the column structure of a standard costing tab with one key addition: a **Source** column that shows the name of the tab each row came from (for example, "Tab 1" or "Tab 3"). This lets you immediately identify which costing sheet owns any given item.
 
 <Note>
-DailyView is hidden when you first open the workbook. It becomes visible only when you activate it via the ribbon. Navigating away hides it automatically again.
+Daily View is hidden when you first open the workbook. It becomes visible only when you activate it via the ribbon. Navigating away hides it automatically again.
 </Note>
 
 The table always reflects the data as of the last refresh — it does not update live as you type on other tabs.
 
-## Refreshing DailyView
+## Refreshing Daily View
 
-When you've made changes on one or more tabs and want DailyView to reflect the latest data, you need to trigger a manual refresh.
+When you've made changes on one or more tabs and want Daily View to reflect the latest data, trigger a manual refresh.
 
 <Steps>
-  <Step title="Click Refresh on the ribbon">
-    Click the **Show Daily View** button on the Luxurique ribbon. This unhides the sheet, runs a full sync across all active MainTable tabs, sorts the result by Date, and lands your cursor at cell D2.
+  <Step title="Click Show Daily View on the ribbon">
+    Click the **Show Daily View** button on the Luxurique ribbon. This unhides the sheet, runs a full sync across all active costing tabs, sorts the result by Date, and lands your cursor at the first data cell.
   </Step>
   <Step title="Review the aggregated rows">
-    Scan the DailyTable. Use Excel's standard column filters or sorting to slice the data — for example, filter by **Category**, **Supplier**, or **Status** to find what you need quickly. Any filters you apply survive a no-change refresh (the sheet is not disturbed unless the underlying data has actually changed).
+    Scan the Daily Table. Use Excel's standard column filters or sorting to slice the data — for example, filter by **Category**, **Supplier**, or **Status** to find what you need quickly. Any filters you apply survive a no-change refresh (the sheet is not disturbed unless the underlying data has actually changed).
   </Step>
 </Steps>
 
@@ -33,43 +33,43 @@ When you've made changes on one or more tabs and want DailyView to reflect the l
 If nothing has changed across your tabs since the last refresh, the sync completes without touching the sheet at all — your filters and sort order are preserved, and the undo stack is not cleared.
 </Tip>
 
-## Editing from DailyView
+## Editing from Daily View
 
-You can edit cost items directly on DailyView without navigating back to the source tab. When editing mode is active, changes you make to a row are written back to the originating MainTable automatically.
+You can edit cost items directly on Daily View without navigating back to the source tab. When editing mode is active, changes you make to a row are written back to the originating costing tab automatically.
 
 <Steps>
   <Step title="Click a row to enter editing mode">
-    Click any data row on DailyView. The row becomes editable in the columns that allow changes.
+    Click any data row on Daily View. The row becomes editable in the columns that allow changes.
   </Step>
   <Step title="Make your changes inline">
-    Edit the cell value as you normally would on a MainTable tab. When you confirm the change (press Enter or Tab), it is written back to the correct row on the source tab.
+    Edit the cell value as you normally would on a costing tab. When you confirm the change (press Enter or Tab), it is written back to the correct row on the source tab.
   </Step>
-  <Step title="DailyView resyncs automatically">
-    After a write-back, DailyView immediately resyncs so the aggregated view reflects your edit.
+  <Step title="Daily View resyncs automatically">
+    After a write-back, Daily View immediately resyncs so the aggregated view reflects your edit.
   </Step>
 </Steps>
 
 <Warning>
-DailyView is a live mirror, not a staging area. Any edit you make here changes the source MainTable row directly. There is no separate confirm step — treat it the same as editing on the tab itself.
+Daily View is a live mirror, not a staging area. Any edit you make here changes the source costing tab row directly. There is no separate confirm step — treat it the same as editing on the tab itself.
 </Warning>
 
 ## Jumping to the source row
 
-If you need to do more extensive editing than a single cell change allows, double-click the **Item ID** cell of any row. DailyView will navigate you directly to that item on its source tab, with the correct cell selected.
+If you need to do more extensive editing than a single cell change allows, double-click the **Item ID** cell of any row. Daily View will navigate you directly to that item on its source tab, with the correct cell selected.
 
 ## Key columns at a glance
 
 <CardGroup cols={2}>
-  <Card title="Source (column D)" icon="table">
+  <Card title="Source" icon="table">
     Shows the display name of the tab the row came from, such as "Tab 1" or "Tab 2". Use this to quickly identify which costing sheet owns an item.
   </Card>
-  <Card title="Include (column G)" icon="check">
-    Mirrors the Include checkbox on the source MainTable. Only rows with Include = TRUE contribute to pricing totals.
+  <Card title="Include" icon="check">
+    Mirrors the Include checkbox on the source costing tab. Only rows with Include set to TRUE contribute to pricing totals.
   </Card>
-  <Card title="Status (column Q)" icon="tag">
-    Items marked "Cancelled" on their source tab are grouped at the bottom of the DailyTable under an AUTO-CANCELLED section.
+  <Card title="Status" icon="tag">
+    Items marked "Cancelled" on their source tab are grouped at the bottom of the Daily Table under a Cancelled Items section.
   </Card>
-  <Card title="SourceIndex / SourceRow (columns AQ–AR)" icon="link">
-    Internal reference columns that link each DailyView row back to its exact position in the originating MainTable. These are used by the write-back logic and do not need to be edited.
+  <Card title="Reference columns" icon="link">
+    The Daily Table includes hidden reference columns that link each row back to its exact position in the originating costing tab. These are used by the write-back logic and do not need to be edited.
   </Card>
 </CardGroup>

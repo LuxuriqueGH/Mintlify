@@ -1,7 +1,7 @@
 ---
-title: "Apply Markup and Pricing Rates in the QC Sheet"
+title: "Configure Markup and Pricing Rates in the QC Sheet"
 sidebarTitle: "Markup & Pricing"
-description: "The MarkupMaster sheet is the global rate matrix. Learn how markup inherits to each tab, the three markup columns, Mixed mode, and per-row overrides."
+description: "Learn how the MarkupMaster rate matrix drives pricing in the QC Sheet, how markup flows to each tab, and when to use per-row price overrides."
 ---
 
 Pricing in the QC Sheet is driven by a category-based markup system. You define your cost, select a category, and the QC Sheet calculates the marked-up selling price automatically. This page explains how the markup hierarchy works, what each pricing column means, and how to override rates when a specific line item needs custom pricing.
@@ -12,19 +12,19 @@ The **MarkupMaster** sheet is the global rate matrix for the entire workbook. It
 
 | Column | Purpose |
 |---|---|
-| **MVA** | Primary markup variant (typically the standard selling rate) |
-| **Effort** | Markup variant for effort-based or time-intensive services |
-| **EXCL** | Exclusive or premium markup rate |
+| **MVA** | Primary markup variant — typically the standard selling rate used for most line items. |
+| **Effort** | Markup variant for effort-based or time-intensive services that carry a higher cost to deliver. |
+| **EXCL** | Exclusive or premium markup rate, used for high-end or bespoke services. |
 
-MarkupMaster is maintained by your management team. If a category or label you need is missing, or if a rate needs updating, contact the person responsible for maintaining the file — do not edit MarkupMaster yourself unless you have been authorised to do so.
+MarkupMaster is a regular Excel table that your management team edits directly. If a category or label you need is missing, or if a rate needs updating, contact the person responsible for maintaining the file. Do not edit MarkupMaster yourself unless you have been authorised to do so.
 
-## Per-tab markup settings (TabNLabels)
+## Per-tab markup settings
 
-Each quote-set tab has its own **TabNLabels** table on the **Tab Details** sheet. This table inherits rates from MarkupMaster and controls which category and label apply to all rows in that tab.
+Each quote-set tab has its own markup configuration on the **Tab Details** sheet. This configuration inherits rates from MarkupMaster and controls which category and label apply to all rows in that tab.
 
-At the top of the TabNLabels block, there are two selector cells:
+At the top of each tab's markup block on Tab Details, there are two selector cells:
 
-- **Category selector (top-left):** Choose the category that applies to this tab (e.g. "Accommodation", "Transport"). All rows in the tab will share this category, and the Category column in the MainTable will be hidden since it is the same for every row.
+- **Category selector (top-left):** Choose the category that applies to this tab (e.g. "Accommodation", "Transport"). All rows in the tab will share this category, and the Category column in the tab will be hidden since every row uses the same value.
 - **Included / Excluded selector (top-right):** Set to **Included** (the default) to include this tab in the Overview totals and the quotation export. Set to **Excluded** to keep the tab for reference without it contributing to the deal's pricing.
 
 <Note>
@@ -35,8 +35,8 @@ Changes to the Included/Excluded selector take effect immediately — the Overvi
 
 If a single tab contains line items across multiple service categories, select **Mixed** in the Category selector. In Mixed mode:
 
-- The **Category** column becomes visible in the MainTable so you can set a different category on each row.
-- The TabNLabels table builds dynamically, maintaining one row per unique Category and Label combination currently in use on the tab.
+- The **Category** column becomes visible in the tab so you can set a different category on each row.
+- The markup configuration on Tab Details builds dynamically, maintaining one row per unique Category and Label combination currently in use on the tab.
 - The **Label** dropdown on each row updates to show only labels valid for that row's chosen category.
 
 <Tip>
@@ -55,7 +55,7 @@ Once a row is activated (Include is ticked) and a cost is entered, the QC Sheet 
 | **Unit Price** | The marked-up price expressed per unit, ready to display on the client quotation. |
 | **Subtotal Price** | The full selling price for this line item as it appears on the quotation (Unit Price × quantities). |
 
-The markup rate applied comes from the TabNLabels table for the tab, which in turn draws from MarkupMaster.
+The markup rate applied comes from the tab's markup configuration on Tab Details, which in turn draws its rates from MarkupMaster.
 
 ## Override columns
 
@@ -73,7 +73,7 @@ Override columns take precedence over the standard MarkupMaster rates. Always do
 </Warning>
 
 <Tip>
-If you need the same non-standard rate on every row of a tab, consider updating the TabNLabels table directly rather than applying individual row overrides. Keeping overrides to a minimum makes the pricing easier to audit.
+If you need the same non-standard rate on every row of a tab, consider updating that tab's markup configuration on Tab Details directly rather than applying individual row overrides. Keeping overrides to a minimum makes the pricing easier to audit.
 </Tip>
 
 ## How markup applies: the full flow
@@ -81,8 +81,8 @@ If you need the same non-standard rate on every row of a tab, consider updating 
 Here is the complete path from cost entry to client-facing price:
 
 1. You enter a cost in **Estimated Unit Cost**, **Supplier Quote Unit Cost**, or **Final Paid Unit Cost** — the most specific non-blank value is used.
-2. The **Category** and **Label** on the row determine which row of the TabNLabels table to read.
-3. The TabNLabels row provides the **MVA**, **Effort**, or **EXCL** rate (whichever your tab is configured to use).
+2. The **Category** and **Label** on the row determine which markup rate to apply.
+3. The applicable **MVA**, **Effort**, or **EXCL** rate (whichever the tab is configured to use) is read from Tab Details, sourced from MarkupMaster.
 4. The QC Sheet applies the rate to produce **Marked Up Cost**, then derives **Unit Price** and **Subtotal Price**.
 5. If any override columns are filled in for the row, they replace the corresponding calculated values.
 6. The **Subtotal Price** rolls up into the tab's total, which flows through to the Overview and the quotation export.

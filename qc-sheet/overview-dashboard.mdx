@@ -6,9 +6,9 @@ description: "The Overview sheet is your QC summary dashboard, showing per-tab c
 
 The Overview sheet is the top-level summary for your entire QC file. It shows you where the project stands financially across every active tab, along with the payment schedule for the client. You will typically check Overview when you need a quick read on total costs, margins, or upcoming payment milestones — without having to open each costing tab individually.
 
-## OverviewTable: per-tab cost summary
+## Cost summary table: per-tab breakdown
 
-The **OverviewTable** sits at the centre of the Overview sheet. It contains one row per active costing tab, automatically populated from the data in each tab's MainTable. The table gives you a side-by-side comparison across all tabs.
+The cost summary table sits at the centre of the Overview sheet. It contains one row per active costing tab, automatically populated from the data in each tab. The table gives you a side-by-side comparison across all tabs.
 
 | Column | What it shows |
 |---|---|
@@ -18,49 +18,49 @@ The **OverviewTable** sits at the centre of the Overview sheet. It contains one 
 | **PAXDA** | Per-person, per-day rate for the tab |
 | **Subtotal Price** | Client-facing subtotal price for the tab |
 
-Totals rows at the bottom of the table aggregate across all tabs. The grand total figures that feed the PDF quotation — **QUOTEPRICE**, **GRANDTOTAL**, and **PERPERSON** — are all derived from these Overview totals.
+Totals rows at the bottom of the table aggregate across all tabs. The grand total figures that feed the PDF quotation — quote price, grand total, and per-person rate — are all derived from these Overview totals.
 
 <Note>
-If a tab has been marked **Excluded** in its Tab Details labels selector, it contributes zero to OverviewTable and to all global totals. An excluded tab will not appear in the PDF or Word export either.
+If a tab has been marked **Excluded** in its Tab Details labels selector, it contributes zero to the cost summary and to all global totals. An excluded tab will not appear in the PDF or Word export either.
 </Note>
 
 ## Project-level fields
 
-Above the OverviewTable you will find the project metadata fields that flow through to every export:
+Above the cost summary table you will find the project metadata fields that flow through to every export:
 
 <CardGroup cols={2}>
   <Card title="Project & Client" icon="user">
-    **PROJECTNAME**, **CLIENTNAME**, **PIC** (person in charge), and **PAX** (traveller count) are entered here and referenced by both the PDF and Word export pipelines.
+    Project name, client name, person in charge, and traveller count (PAX) are entered here and referenced by both the PDF and Word export pipelines.
   </Card>
   <Card title="Dates & Duration" icon="calendar">
-    **STARTDATE**, **ENDDATE**, and the calculated **DURATION** field. These drive date formatting on the quotation cover and per-person/per-day calculations.
+    Start date, end date, and the calculated duration field. These drive date formatting on the quotation cover and per-person/per-day calculations.
   </Card>
   <Card title="Fees & Rates" icon="percent">
-    **COORDFEE**, **TAX**, **PMNTFEE**, **MARGIN**, and **COMMRATE** are set here. Non-zero fee values cause the matching fee rows (Coordination, Tax, Payment) to appear automatically on the PDF quotation.
+    Coordination fee, tax rate, payment fee, margin, and commission rate are set here. Non-zero fee values cause the matching fee rows (Coordination, Tax, Payment) to appear automatically on the PDF quotation.
   </Card>
   <Card title="Totals" icon="sigma">
-    **SUBPRICE**, **QUOTEPRICE**, **TAXAMOUNT**, **GRANDTOTAL**, and **PERPERSON** are calculated here and consumed directly by the quotation rebuild and all three export formats.
+    Subtotal price, quote price, tax amount, grand total, and per-person rate are calculated here and consumed directly by the quotation layout and all three export formats.
   </Card>
 </CardGroup>
 
-## PaymentTable: payment schedule
+## Payment schedule table
 
-The **PaymentTable** sits below the OverviewTable on the same Overview sheet. It holds the payment schedule for this specific quotation — the deposit, progress payments, and balance — including due dates, amounts, and payment tracking (Amount Paid, Date Paid).
+The payment schedule table sits below the cost summary on the same Overview sheet. It holds the payment schedule for this specific quotation — the deposit, progress payments, and balance — including due dates, amounts, and payment tracking (amount paid, date paid).
 
-You can populate the PaymentTable manually, or apply a reusable template from the PaymentMaster sheet.
+You can populate the payment schedule manually, or apply a reusable template from the Payment Master sheet.
 
 <Tip>
-To apply a payment policy template, select a policy from the **Select Policy** dropdown at the top of the PaymentTable. The amounts and due dates will populate automatically based on the GRANDTOTAL and STARTDATE for this quotation.
+To apply a payment policy template, select a policy from the **Select Policy** dropdown at the top of the payment schedule table. The amounts and due dates will populate automatically based on the grand total and start date for this quotation.
 </Tip>
 
-## PaymentMaster: reusable payment policy templates
+## Payment Master: reusable payment policy templates
 
-The **PaymentMaster** sheet holds a library of pre-configured payment policies (`tPaymentMaster` table). Each policy defines a structured set of payment rows — deposit percentage, progress payment schedule, balance timing — that you can apply to any QC in one step via the PaymentTable dropdown.
+The **Payment Master** sheet holds a library of pre-configured payment policies. Each policy defines a structured set of payment rows — deposit percentage, progress payment schedule, balance timing — that you can apply to any QC in one step via the payment schedule dropdown.
 
 <Note>
-PaymentMaster is a shared reference sheet. Changes you make to a policy template there will affect how it populates on future quotations, but they do not retroactively update any PaymentTable that has already been applied.
+Payment Master is a shared reference sheet. Changes you make to a policy template there will affect how it populates on future quotations, but they do not retroactively update any payment schedule that has already been applied.
 </Note>
 
 ## Overview as the single source of truth
 
-Everything on the Overview sheet flows downstream. The quotation rebuild reads fee values, project metadata, and global totals from here. The PDF, Word, and XLSX exports all reference the same named ranges — **PROJECTNAME**, **GRANDTOTAL**, **PERPERSON**, and so on — that point back to Overview cells. Keeping the Overview fields up to date before you export ensures that every output is consistent.
+Everything on the Overview sheet flows downstream. The quotation layout reads fee values, project metadata, and global totals from here. The PDF, Word, and XLSX exports all reference the same fields — project name, grand total, per-person rate, and so on — that point back to Overview cells. Keeping the Overview fields up to date before you export ensures that every output is consistent.

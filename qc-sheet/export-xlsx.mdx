@@ -12,7 +12,7 @@ The exported file opens automatically after saving, so you can review it before 
 
 <CardGroup cols={2}>
   <Card title="Sharing with suppliers" icon="share">
-    Give a supplier a clean cost breakdown without exposing your formulas, markup logic, or internal named ranges.
+    Give a supplier a clean cost breakdown without exposing your formulas, markup logic, or internal workbook structure.
   </Card>
   <Card title="Client-facing spreadsheets" icon="file-spreadsheet">
     Some clients prefer a spreadsheet they can open and navigate without needing a macro-enabled workbook or a special Excel version.
@@ -29,19 +29,19 @@ The exported file opens automatically after saving, so you can review it before 
 
 <Steps>
   <Step title="Select the active tab">
-    Navigate to the costing tab that corresponds to the quotation you want to export. The export rebuilds from the active MainTable if the staging is stale.
+    Navigate to the costing tab that corresponds to the quotation you want to export. The export rebuilds from the active costing tab if the layout is stale.
   </Step>
   <Step title="Choose the brand template">
     In the ribbon's **Quotation** group, open the **Template** dropdown and confirm the correct brand is selected — **LUX** (Luxurique), **LXT** (Luxurique Travel), or **LBT** (Liberty). The XLSX is generated from that brand's quotation sheet.
   </Step>
   <Step title="Click Export XLSX">
     Click **Export XLSX** on the ribbon. The workbook will:
-    1. Check whether the quotation staging is current and rebuild if needed.
+    1. Check whether the quotation layout is current and rebuild if needed.
     2. Force a full recalculation so all cached values are up to date.
     3. Copy the active quotation sheet to a new, single-sheet workbook.
     4. Replace every formula with its current calculated value.
-    5. Remove all named ranges and the internal Item ID column (column A).
-    6. Save the file as `.xlsx` to your Desktop, stripping VBA in the process.
+    5. Remove all named ranges and the internal reference column.
+    6. Save the file as `.xlsx` to your Desktop, stripping all macros in the process.
     7. Open the sanitised file for your review.
   </Step>
   <Step title="Review and distribute">
@@ -74,7 +74,7 @@ The Desktop path is resolved correctly even when your Desktop is redirected to O
 |---|---|
 | All cell values (frozen at export time) | All formulas |
 | Brand logo and other images | All named ranges |
-| Table layout and formatting | Column A (internal Item ID column) |
+| Table layout and formatting | Internal reference column |
 | Row heights and column widths | All VBA macros |
 | | Workbook links and external references |
 

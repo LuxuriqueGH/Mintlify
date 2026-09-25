@@ -1,5 +1,5 @@
 ---
-title: "Create and Manage Projects in the QC Webapp"
+title: "Projects: Creating and Managing Deals in the QC Webapp"
 sidebarTitle: "Projects"
 description: "A Project is the top-level container for a deal. Link it to Twenty CRM to pull in client details automatically, or fill in fields by hand."
 ---
@@ -26,7 +26,7 @@ A **Project** is the top-level container in the QC Webapp — one project per de
     </Tip>
   </Step>
   <Step title="Save the project">
-    Click **Create**. The app creates the project, assigns you (the creator) with `scope = all`, and assigns all current Sales Leads with `scope = all` automatically.
+    Click **Create**. The app creates the project and automatically gives you (the creator) and all current Sales Leads full access to it.
   </Step>
 </Steps>
 
@@ -53,7 +53,7 @@ Unlinking a deal returns all CRM fields to editable free text. The previously pu
 
 ## CRM push
 
-Active QC totals, PAX, and date ranges can be pushed to the linked Twenty opportunity. The push is triggered by publishing a quotation or via the manual **Push to CRM** button on the project page (SL+). Only QCs with their **active flag** turned on contribute to the rollup that gets pushed.
+Active QC totals, PAX, and date ranges can be pushed to the linked Twenty CRM deal. The push is triggered by publishing a quotation or via the manual **Push to CRM** button on the project page (SL+). Only QCs with their **active flag** turned on contribute to the rollup that gets pushed.
 
 ## Trashing and deleting a project
 
@@ -61,9 +61,9 @@ Projects follow a two-tier deletion process to prevent accidental permanent loss
 
 | Step | Who can do it | What happens |
 |---|---|---|
-| **Trash** | Any user with `scope = all` on the project | The project is soft-deleted. All QCs inside it become **read-only** immediately. The project appears in the Trash. |
+| **Trash** | Any member with full project access | The project is soft-deleted. All QCs inside it become **read-only** immediately. The project appears in the Trash. |
 | **Restore from Trash** | Same users who can trash | The project is restored. QCs become editable again. |
-| **Permanently delete (→ Archive)** | Any user with `scope = all` on the project | The project moves to the Admin-only archive. Below Admin, this looks the same as permanent deletion. |
+| **Permanently delete (→ Archive)** | Any member with full project access | The project moves to the Admin-only archive. Below Admin, this looks the same as permanent deletion. |
 | **Unarchive** | Admin only | The project is moved back to the Trash, with memberships intact. |
 | **Destroy** | Admin only | Permanent and irreversible. The project and all its QCs are destroyed. |
 
@@ -72,5 +72,5 @@ Projects follow a two-tier deletion process to prevent accidental permanent loss
 </Warning>
 
 <Note>
-  When a project is trashed, its QCs are not listed or actioned separately in the Trash view. They are represented under the project's own Trash entry. Restore the project to restore all its QCs at once.
+  When a project is trashed, its QCs are not listed or actioned separately in the Trash view — they are represented under the project's own Trash entry. Restore the project to restore all its QCs at once.
 </Note>

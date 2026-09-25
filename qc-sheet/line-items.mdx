@@ -1,5 +1,5 @@
 ---
-title: "Add and Edit Cost Line Items in the QC Sheet"
+title: "Adding and Editing Cost Line Items in the QC Sheet"
 sidebarTitle: "Line Items"
 description: "Every row in a quote-set tab is a cost line item. Learn the key columns, how to activate a row with the Include checkbox, and how to use the Detail field."
 ---
@@ -17,7 +17,8 @@ The table below covers the columns you work with most often. Formula and system 
 | **Category** | The cost category that drives markup (e.g. "Accommodation", "Transport"). Drawn from the MarkupMaster rate matrix. |
 | **Label** | The sub-classification within the chosen Category (e.g. "Hotel – 5 Star", "Private Transfer"). The available options update automatically when you set the Category. |
 | **City** | The city or destination where the service takes place. Required for activation. |
-| **Qty A / Unit A** | Primary quantity and its unit (e.g. 2 nights, 1 vehicle). |
+| **Costing Basis** | The basis used to calculate cost (e.g. per person, per vehicle). Required for activation. |
+| **Qty A / Unit A** | Primary quantity and its unit (e.g. 2 nights, 1 vehicle). Required for activation. |
 | **Qty B / Unit B** | Secondary quantity and unit where a service has two dimensions (e.g. 10 guests at 1 meal each). |
 | **Estimated Unit Cost** | Your initial cost estimate before supplier confirmation. |
 | **Supplier Quote Unit Cost** | The unit cost as quoted by the supplier. Overrides the estimate in pricing once filled in. |
@@ -36,13 +37,13 @@ Filling in the columns above does not automatically make a row part of the quota
 
 Here is what happens when you tick Include:
 
-1. The QC Sheet validates that the row has the minimum required fields: **Date**, **City**, **Qty**, **Label**, and **Costing Basis**.
-2. If validation passes, a unique **Item ID** is generated for the row in the format `ProjectID-SubID-RandomToken`. This ID is stable and persists for the lifetime of the row.
-3. The row becomes a "1 of 1" group and is incorporated into the table's sort order.
+1. The QC Sheet validates that the row has the minimum required fields: **Date**, **City**, **Qty A**, **Label**, and **Costing Basis**.
+2. If validation passes, a unique **Item ID** is generated for the row. This ID is stable and persists for the lifetime of the row — it is used to track the item across the audit log and the quotation export.
+3. The row is incorporated into the table's sort order and becomes part of the tab's pricing.
 4. The row contributes to the tab's subtotal and the Overview grand total.
 
 <Warning>
-If you tick Include and nothing happens (no Item ID appears), check that the **Project ID** and **Sub ID** have been set on the Overview sheet, and that all required fields (Date, City, Qty, Label, Costing Basis) are filled in. The row will not activate until all are present.
+If you tick Include and nothing happens (no Item ID appears), check that the **Project ID** and **Sub ID** have been set on the Overview sheet, and that all required fields (Date, City, Qty A, Label, Costing Basis) are filled in. The row will not activate until all are present.
 </Warning>
 
 To remove a row from the quotation without deleting it, untick the Include checkbox. The row stays in the table but no longer contributes to any totals.
