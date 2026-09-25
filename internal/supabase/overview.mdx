@@ -1,0 +1,63 @@
+---
+title: "Luxurique Supabase — CRM activity capture"
+sidebarTitle: "Overview"
+description: "Supabase project that captures every Twenty CRM record change via webhook into an append-only activity_log table, and derives analytics from it."
+---
+
+Supabase project that captures every Twenty CRM record change (via webhook) into an append-only `activity_log` table, and derives analytics (win-rate per stage, funnel, inflow, cashflow) from it.
+
+Extracted from the `../n8n` repo to keep automation and analytics separate.
+
+## Documentation
+
+- [**docs/**](docs/) — canonical docs: [architecture](docs/architecture.md), [components](docs/components/), and [decision records (ADRs)](docs/adr/).
+- [**CLAUDE.md**](CLAUDE.md) — AI/agent context + Twenty webhook internals.
+- [**guide.md**](guide.md) — hand-held, no-experience-assumed setup walkthrough.
+
+## Layout
+
+```text
+supabase/
+  config.toml                 CLI config
+  migrations/
+    *.sql                     ~45 timestamped migrations (annotated list in CLAUDE.md)
+  functions/twenty-webhook/   Deno edge function: HMAC verify -> dedupe -> insert
+../Twenty/scripts/fetch-twenty-schema.py  refresh Twenty GraphQL introspection (sibling repo)
+```
+
+## Quickstart
+
+```sh
+# 1. apply the database schema (after linking the project)
+npx supabase link --project-ref <your-project-ref>
+npx supabase db push
+
+# 2. deploy the webhook receiver (verify_jwt=false is set in config.toml)
+npx supabase functions deploy twenty-webhook
+
+# 3. give the function the shared secret
+npx supabase secrets set TWENTY_WEBHOOK_SECRET=<strong-random-secret>
+```
+
+Then register a webhook in Twenty (Settings → APIs & Webhooks) pointing at `https://<project-ref>.functions.supabase.co/twenty-webhook` with the same secret, subscribed to `*.created`, `*.updated`, `*.deleted`.
+
+Full steps with screenshots-level detail: [**guide.md**](guide.md).
+
+## Verify
+
+```sql
+select object, action, record_id, happens_at, updated_fields
+from activity_log order by id desc limit 5;
+
+select stage, count(*) as deals
+from opportunity_current
+group by stage order by deals desc;
+```
+
+## Schema fetch
+
+The Twenty GraphQL introspection fetcher and schema dumps have moved to the `../Twenty/` sibling repo. Run `../Twenty/scripts/fetch-twenty-schema.py` (needs `TWENTY_API_TOKEN` in `../Twenty/.env`) when Twenty objects or fields change.
+
+## Dashboards (Superset / Preset.io)
+
+BI runs on **Superset (Preset.io)** (sibling repo `../Superset`), reading a private, **aggregate-only** `analytics` schema (security-definer functions, called as `analytics.<name>()`) through a least-privilege `preset_ro` role — never the raw ledger. The schema is created by `supabase/migrations/*_analytics_*.sql` and the live BI role by `*_preset_analytics_role.sql`; after `db push`, set the role's password out-of-band and follow `../Superset/connection.md`. See [ADR-0011](docs/adr/0011-bi-surface-via-analytics-schema.md) + [ADR-0012](docs/adr/0012-analytics-surface-definer-functions-not-views.md).

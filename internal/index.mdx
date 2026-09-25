@@ -1,0 +1,45 @@
+---
+title: "Luxurique Internal Engineering Documentation"
+sidebarTitle: "Introduction"
+description: "Engineering docs for the Luxurique platform systems. Navigate to Supabase, n8n, Superset, SupplierDB, Twenty, Vero, Asana, QC Webapp, and STE-100."
+---
+
+These pages contain the internal engineering documentation for the Luxurique platform. They cover system architecture, design decisions, specifications, and operational runbooks for the services and tools that power the business.
+
+<CardGroup cols={3}>
+  <Card title="Supabase" icon="database" href="/internal/supabase/index">
+    CRM activity capture, analytics views, and the cluster spine.
+  </Card>
+
+  <Card title="n8n" icon="workflow" href="/internal/n8n/index">
+    Workflow automation for email triage, Twenty upserts, and Slack alerts.
+  </Card>
+
+  <Card title="Superset" icon="chart-bar" href="/internal/superset/index">
+    Hosted BI over Supabase's aggregate-only analytics schema.
+  </Card>
+
+  <Card title="SupplierDB" icon="truck" href="/internal/supplierdb/index">
+    SharePoint Lists to Twenty supplier migration.
+  </Card>
+
+  <Card title="Twenty" icon="address-book" href="/internal/twenty/index">
+    The CRM hub, schema source of truth, and vendored source.
+  </Card>
+
+  <Card title="Vero" icon="envelope" href="/internal/vero/index">
+    Vero 2.0 email-marketing layer and audience SQL.
+  </Card>
+
+  <Card title="Asana" icon="list-check" href="/internal/asana/index">
+    Asana and Twenty integration layer for deal projects and task loops.
+  </Card>
+
+  <Card title="QC Webapp Internal" icon="code" href="/internal/qc-web/index">
+    Webapp rebuild of the Quotation and Costing Engine.
+  </Card>
+
+  <Card title="STE-100" icon="book" href="/internal/ste100/index">
+    ASD-STE100 compliance toolkit for markdown documentation.
+  </Card>
+</CardGroup>

@@ -1,0 +1,21 @@
+---
+title: "Components"
+sidebarTitle: "Components"
+description: "One page per component for the Luxurique Supabase system. Each page covers what it is, its responsibilities, inputs/outputs, where it lives, and gotchas."
+---
+
+One page per component. Each page is succinct (≈ one screen): what it is, its responsibilities, inputs/outputs, where it lives, and gotchas. Code is the source of truth; these pages explain intent and contracts.
+
+| Component | File(s) | One-liner |
+| --- | --- | --- |
+| [twenty-webhook](twenty-webhook.md) | `supabase/functions/twenty-webhook/index.ts` | Edge function: authenticate Twenty, dedupe, append one row per event. |
+| [activity-log](activity-log.md) | `supabase/migrations/*_activity_log.sql` | The append-only ledger — generic envelope + jsonb payload. |
+| [projections](projections.md) | `supabase/migrations/*_projections.sql` | Read models derived from the ledger: stage occupancy, transitions, survival-aware dwell, and business KPIs (win rate, funnel, loss, aging, pipeline). |
+| [backfill](backfill.md) | `scripts/backfill.py` | Snapshot every object's current state into the ledger — t=0 seed + deep audits (full sweep). |
+| [reconcile](reconcile.md) | `supabase/functions/reconcile/index.ts` | Edge function, pg_cron every 10 min: recovers dropped webhooks via an incremental `updatedAt` delta. |
+| [config](config.md) | `supabase/config.toml` | Supabase CLI config; webhook runs without JWT verification. |
+| [fetch-twenty-schema](fetch-twenty-schema.md) | `../../../Twenty/scripts/fetch-twenty-schema.py` (moved to `../../../Twenty/`) | Pull Twenty's GraphQL schema for grounding calls. |
+| [bi-surface](bi-surface.md) | `supabase/migrations/*_analytics_*.sql`, `*_preset_analytics_role.sql` | Private `analytics` schema (aggregate-only, security-definer functions) + `preset_ro` role for Superset (Preset.io). |
+| [drift-watch](drift-watch.md) | `supabase/migrations/20260722140000_schema_drift_watch.sql` | Catalog-derived detector for a Twenty field rename the read layer hasn't bridged yet: `public.schema_drift()` + `schema_drift_tombstone`, surfaced via `analytics.data_quality()` rows. |
+| [nas-backup](nas-backup.md) | (on-prem Synology NAS, not in repo) | Nightly `pg_dump` of the whole DB to an encrypted NAS folder via a Docker container; 120-day retention. |
+| [marketing-surface](marketing-surface.md) | `supabase/migrations/20260825120000_marketing_synced_surface.sql`, `20260825130000_rudder_retl_role.sql` | Row-level `marketing.synced()` (DEFINER fn over `person_current`) + the `rudder` RETL role — what the email tier reads to build audiences (ADR-0037, ADR-0039). Membership = `marketingEmailStatus IS NOT NULL`, so it carries unsubscribed people on purpose; membership is not consent. |

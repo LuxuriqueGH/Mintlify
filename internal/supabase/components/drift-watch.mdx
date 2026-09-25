@@ -1,0 +1,77 @@
+---
+title: "Component: schema_drift (read-layer schema-drift watch)"
+sidebarTitle: "Drift Watch"
+description: "Catalog-derived detector for unbridged Twenty field renames that would silently NULL analytics view columns. Self-maintaining via regex scans of pg_get_viewdef and pg_proc.prosrc."
+---
+
+**File:** [`supabase/migrations/20260722140000_schema_drift_watch.sql`](../../supabase/migrations/20260722140000_schema_drift_watch.sql) (tombstones + original detector), superseded in place by [`supabase/migrations/20260722143000_schema_drift_lastseen_anchor.sql`](../../supabase/migrations/20260722143000_schema_drift_lastseen_anchor.sql) (last-seen-anchored `schema_drift()` + matching `data_quality()` columns), perf follow-ups in [`supabase/migrations/20260722170000_schema_drift_single_pass.sql`](../../supabase/migrations/20260722170000_schema_drift_single_pass.sql) (single-pass unnest rewrite) and [`supabase/migrations/20260722180000_schema_drift_state_cache.sql`](../../supabase/migrations/20260722180000_schema_drift_state_cache.sql) (`schema_drift_state` cache table + `schema_drift_refresh()` — the current shape of the BI-facing surface) **Related:** [ADR-0030](../adr/0030-read-layer-schema-drift-watch.md), [ADR-0022](../adr/0022-amount-paid-rename-coalesce-bridge.md) (the coalesce-bridge pattern this check watches for), [ADR-0024](../adr/0024-bi-semantic-contract.md) (`analytics.data_quality()`, the surface this feeds), [ADR-0023](../adr/0023-scheduled-incremental-reconcile-edge-function.md) (`reconcile_state` — the precedent for a mutable cache beside the immutable log)
+
+## What it is
+
+A catalog-derived detector for the failure that let Twenty's `lossReason` → `closeReason` rename go silently `NULL` for two weeks (found 2026-07-22): a field renamed upstream, whose old jsonb key stops appearing in fresh `activity_log` envelopes, while a `public` view or `analytics` function still extracts it. No error, no crash — just a column that quietly stops updating.
+
+**Self-maintaining by construction:** `public.schema_drift()` regex-scans `pg_get_viewdef()` of every `public` view and `pg_proc.prosrc` of every `analytics` function _at call time_ to derive its own watched-key and watched-object lists. Add a new view that reads `record->>'someField'`, and the next call already covers it — no second migration to register a key.
+
+**Two paths, since ADR-0030 Amendment 2:** `public.schema_drift()` is the **fresh-compute path** (~seconds, scales with `activity_log` volume, no latency target — call it directly for the current truth, e.g. right after landing a coalesce-bridge repair). `public.schema_drift_state` is the **cached, BI-facing path** (a plain table, ~63 rows, sub-second reads, refreshed daily by the cron) — `analytics.data_quality()` and the Slack alert both read the cache, not the function. See "Cache staleness" below.
+
+## Status taxonomy
+
+Four statuses (`NO_RECENT_DATA` was dropped in the last-seen-anchoring fix — see below). Return shape: `(object, key, status, last_seen timestamptz,
+envelopes_after bigint, window_rows bigint, window_with bigint)`.
+
+| Status | Meaning | Alerted? |
+| --- | --- | --- |
+| `OK` | Established key (`window_with >= 80%` of `window_rows`, `window_rows >= 20`, over the 28 days up to its own `last_seen`) with `< 5` envelopes captured since. | No — the healthy case (includes keys still actively present, since a live key's `last_seen` is essentially "now"). |
+| `BROKEN` | Established key (same gate) with `>= 5` object envelopes captured _after_ `last_seen`. The signature of an unbridged rename. **Time-invariant** — persists forever until tombstoned, however long ago the key vanished. | **Yes** — `data_quality()` `error` row + Task 3's daily Slack alert. |
+| `RETIRED` | Key listed in `schema_drift_tombstone` — a known, already-bridged rename kept only as a `coalesce()` fallback. | No — this is the mechanism that keeps a _fixed_ rename from alarming forever. |
+| `NEW_UNREAD` | Key seen `>= 3` times in the last 7 days on a watched object, not a watched key, not tombstoned, and absent from every envelope older than 14 days — a genuinely new field nothing reads yet. `envelopes_after` is always `0`; `window_rows`/`window_with` here mean last-7d totals, not a pre-vanish window (there's no vanish point for a key that's currently present). | **Yes** (`info` severity) — the leading indicator that would have caught `closeReason` the week it appeared. |
+
+**Column meanings (BROKEN/OK/RETIRED):** `last_seen` = the key's own newest envelope; `envelopes_after` = object envelopes captured since (the missing streak — grows unboundedly while unbridged); `window_rows`/`window_with` = object envelopes / envelopes-with-the-key in the **28 days up to `last_seen`**, a frozen slice that never erodes as time passes.
+
+**Detection lag:** at current volume (~500 deal envelopes/day; Deal = Twenty object, API name `opportunity`), `BROKEN` fires the same day the post-vanish streak crosses 5 — Task 3's cron then picks it up on its next daily run. No structural weeks-long delay (the original NOW-anchored design had one; fixed by anchoring to `last_seen`).
+
+Full design rationale (thresholds, the `object = '<literal>'` derivation limit, why last-seen anchoring replaced the original NOW-anchored window) is in [ADR-0030](../adr/0030-read-layer-schema-drift-watch.md).
+
+## Cache staleness (ADR-0030 Amendment 2)
+
+`analytics.data_quality()` reads `public.schema_drift_state`, **not** `public.schema_drift()` directly — a plain table (one row per watched `(object, key)`, ~63 rows), refreshed wholesale by `public.schema_drift_refresh()` inside a single transaction (readers never see an empty or partial cache mid-refresh). This caps `data_quality()`'s drift-read cost at a small constant, independent of `activity_log` volume, instead of re-running the multi-second unnest compute on every BI read.
+
+- **Refresh cadence:** daily, by the `schema-drift-watch` cron (`0 22 * * *` = 07:00 JST) — the same job that fires the Slack alert, now split into "refresh the cache" then "alert from the cache". The refresh runs unconditionally (even if the Slack secret is unarmed), so the BI surface stays live independent of alerting being armed.
+- **Staleness bound: ≤24h**, by design — matches the drift check's already-daily cadence, so nothing about _when_ drift is detected changes, only where `data_quality()` reads its snapshot from.
+- **Need a fresher read right now?** Run `select public.schema_drift_refresh();` (service-role only) to recompute the cache on demand, then re-query `analytics.data_quality()` or `select * from public.schema_drift_state` directly. For the absolute current truth without touching the cache at all, call `select * from public.schema_drift()` directly (the fresh-compute path).
+- **`schema_drift_state` is a cache, not a source of truth** — same discipline as `reconcile_state` (ADR-0023, "mutable bookmark, not the ledger"): never derive analytics from it beyond drift status; `schema_drift()` is ground truth, the table is a snapshot of it.
+
+## The two surfaces
+
+1. **`analytics.data_quality()`** (BI, pull) — three row groups, appended without changing the function's `(check_name, severity, deals, amount)` shape:
+   - `schema_drift` — always present, `error`, `deals` = count of `BROKEN` keys (the stable dashboard-tile target; `0` when healthy).
+   - `schema_drift:<object>.<key>` — one `error` row per `BROKEN` key, only when non-empty; `deals` = `envelopes_after` (envelope count captured since the key was last seen — the length of the missing streak).
+   - `unwired_field:<object>.<key>` — one `info` row per `NEW_UNREAD` key, only when non-empty; `deals` = `window_with` (last-7d envelope count carrying the new key).
+   `amount` is always `0` on drift rows — there's no JPY-impact dimension for a schema problem. Aggregate-only (key names + counts, no per-deal identifiers), so it stays inside the ADR-0011 privacy contract even though `preset_ro` reads it.
+2. **Daily cron → Slack** (push) — the **`schema-drift-watch`** `pg_cron` job (`supabase/migrations/20260722150000_schedule_schema_drift_alert.sql`, later re-pointed by `20260722180000_schema_drift_state_cache.sql` to refresh-then-alert, ADR-0030), same idempotent-reschedule + Vault-gated pattern as `reconcile-liveness` (`20260701121000_schedule_reconcile.sql`). Runs `0 22 * * *` = **07:00 JST** daily; its body is now two statements: `select public.schema_drift_refresh();` (unconditional — keeps the cache live even when unarmed) then the alert `net.http_post`, which posts to **#pipeline-alerts** via the `alerts_slack_webhook` Vault secret (the same wire the reconcile dead-man alert uses).
+   - **Fires** only when `public.schema_drift_state` has **\>= 1 `BROKEN`** row (gated on the secret existing too — unarmed = silent no-op; reads the just- refreshed cache, so same-run consistent). The message lists every `BROKEN` `object.key` plus, appended as an info addendum, any `NEW_UNREAD` keys riding along — `NEW_UNREAD` never triggers a post on its own.
+   - **Re-fires daily until healed** — `BROKEN` is time-invariant (see Status taxonomy above), so this alert deliberately doesn't self-clear either. It stops the day the rename-repair recipe below is applied (the key flips to `RETIRED`).
+   - **Delivery-tested 2026-07-22**: dry-ran the job body verbatim against live data (0 `BROKEN` keys → 0 rows, correct no-op) and posted the one-time labeled test line, confirmed `status_code = 200` in `net._http_response`.
+
+## The rename-repair recipe (the operational payoff)
+
+This is why the check exists: when `schema_drift()` reports a `BROKEN` row for `<object>.<oldKey>`, do exactly what Task 1 did for `lossReason`:
+
+1. **Add a coalesce-bridge migration** on the affected view/function — the ADR-0022 pattern: `coalesce(record->'<newKey>', record->'<oldKey>')`, output column name unchanged, comment + grants re-issued verbatim.
+2. **Insert a tombstone row for the old key in the SAME migration:**
+   ```sql
+   insert into public.schema_drift_tombstone (object, key, note, retired_on) values
+     ('<object>', '<oldKey>', 'renamed -> <newKey>; coalesce bridge in <this migration>.sql', current_date)
+   on conflict (object, key) do nothing;
+   ```
+3. **Re-run `select * from public.schema_drift()`** (the fresh-compute path — do not wait on the cache) — the old key should now read `RETIRED`; the new key reads `OK` (if already established) or is simply absent (if too recently established — not `BROKEN`, not `NEW_UNREAD` since Task 1 or this step already made it a watched key by adding the extraction). To also clear the BI surface / silence the Slack alert immediately rather than waiting for the next daily cron, run `select public.schema_drift_refresh();` right after.
+
+Skip step 2 and the bridge still works, but `schema_drift()` flags the old key `BROKEN` — permanently, since `BROKEN` no longer expires — until the tombstone is added. See the tombstone table's own `comment on table`.
+
+## Gotchas / limits
+
+- **Tombstone is permanently load-bearing.** Under last-seen anchoring, `BROKEN` never expires on its own — removing (or never adding) a tombstone for a bridged rename means it alarms **forever**, not just for a limited window. Verified live 2026-07-22: with `schema_drift_tombstone` emptied in a rolled-back transaction, both `amountPaid` (last seen 24 days prior) and `lossReason` (last seen 14 days prior) correctly reported `BROKEN` regardless of age — confirming the fix (see ADR-0030 Consequences for the prior, now-superseded NOW-anchored behavior where this same test produced zero `BROKEN` rows).
+- **A field needs ~3+ weeks of history (`>= 20` envelopes, `>= 80%` presence in the 28 days up to its own `last_seen`) before a rename to be caught.** A field renamed shortly after creation is invisible to `BROKEN` (never `OK` either) — same underlying constraint as the original design, now measured against the vanish point instead of `now()`.
+- **Object scoping is regex-derived from `object = '<literal>'` comparisons only.** An `IN`-list form in a future view needs the pattern extended (ADR-0030).
+- **A brand-new watched object** floods `NEW_UNREAD` with its whole key set the moment it's added to a view/function and starts collecting volume — expected, not a bug; it settles once each field either gets wired into a view (becomes watched) or is tombstoned/ignored.
+- **`schema_drift_tombstone` is service-role only** (ADR-0010 pattern — revoked from `anon`/`authenticated`), same as every other object this migration adds.

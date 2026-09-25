@@ -1,0 +1,95 @@
+---
+title: "Component: projections (read models)"
+sidebarTitle: "Projections"
+description: "Typed read models derived from the activity_log ledger, including stage occupancy, transitions, survival-aware dwell, and business KPIs (win rate, funnel, loss, aging, pipeline)."
+---
+
+> **STALE (2026-07-16 note): every object below was torn down.** The `20260625120000_teardown_derived_analytics_layer.sql` migration dropped the `opportunity_stage_occupancy` matview, `opportunity_stage_transitions`, `opportunity_stage_dwell_km`, `opportunity_win_rate`, `opportunity_funnel_conversion`, `opportunity_loss_analysis`, `opportunity_aging`, `opportunity_weighted_pipeline`, `opportunity_outcome`, the old `opportunity_current`, and `refresh_projections()` wholesale, in favor of a from-scratch rebuild (see that migration's header). The current surface is `public.opportunity_current` (rebuilt) + the `analytics.*` definer functions documented in [`bi-surface.md`](bi-surface.md) — this page still describes the pre-teardown (Era 1) design and has not been rewritten for Era 2. Kept for historical reference to the censoring-aware design (ADR-0008/0009); do not run the SQL below — the objects don't exist. Since 2026-09-25 the Era-2 stage-span model is the view `public.opportunity_stage_spans` (ADR-0051): one row per opportunity event with the stage corrected by `analytics.stage_history_override`. See [`bi-surface.md`](bi-surface.md).
+
+**Files:** [`*_projections.sql`](../../supabase/migrations/20260604120002_projections.sql) → [`*_fix_stage_transition_ordering.sql`](../../supabase/migrations/20260622120000_fix_stage_transition_ordering.sql) → [`*_censoring_aware_projections.sql`](../../supabase/migrations/20260622130000_censoring_aware_projections.sql) → [`*_business_analytics.sql`](../../supabase/migrations/20260622140000_business_analytics.sql) (current) **Related:** [ADR-0003](../adr/0003-append-only-derive-via-views.md), [ADR-0008](../adr/0008-censoring-aware-read-models.md), [ADR-0009](../adr/0009-curated-stage-taxonomy-and-business-metrics.md), [ADR-0010](../adr/0010-lock-analytics-surface-to-service-role.md)
+
+## What it is
+
+Typed, fast answers to specific analytics questions, **derived** from the generic [`activity_log`](activity-log.md). The ledger stays generic; each read model shapes it for one question. Adding a question = adding a view, never a migration of the source data.
+
+## Read models
+
+### `opportunity_stage_occupancy` (materialized view) — the base
+
+One row per **period a deal sat in a stage**, _including the open current one_. This is the SCD-Type-2 / timespan model everything else builds on. (Deal = Twenty's Opportunity object; API name `opportunity`.)
+
+| Column | Meaning |
+| --- | --- |
+| `event_id` | Source `activity_log.id` that opened this occupancy; unique per row. |
+| `opportunity_id` | The record. |
+| `stage` | The stage occupied. |
+| `entered_at` / `exited_at` | Period bounds; `exited_at` null = still here. |
+| `dwell` | `coalesce(exited_at, now()) − entered_at` (`now` = last refresh). |
+| `is_open` | `exited_at is null` — **right-censored** (still accumulating). |
+| `is_left_censored` | First occupancy seeded by a backfill `snapshot` — its `entered_at` is the artificial t=0, not the true (earlier) entry. |
+
+Built from `action in ('created','snapshot')` plus `updated` with `stage` in `updated_fields`, ordered by `(happens_at, id)`. **Consecutive identical stages are collapsed** (`stage IS DISTINCT FROM lag(stage)`) so a reconciliation snapshot that merely confirms the current stage adds no spurious transition, while one that reveals a stage change Twenty never delivered still registers. Unique index on `(event_id)`.
+
+### `opportunity_stage_transitions` (view)
+
+`from → to` transitions, derived live from occupancy (`lag(stage)`). Same columns as before (`from_stage`, `to_stage`, `entered_from_at`, `entered_to_at`, `time_in_from_stage`); now a plain view, so it's always fresh — no separate refresh.
+
+### `opportunity_stage_dwell_km` (view) — the honest metric
+
+Per-stage dwell. **Use this, not a raw `AVG`.** A naive average over completed transitions under-counts, because the longest-dwelling deals are the ones _still open_ (right-censored) and so excluded. This view reports:
+
+- `km_median_dwell` — **Kaplan–Meier** median, which correctly consumes the open (right-censored) deals. `null` when survival never reaches 0.5 (honest: median not yet observed). Left-censored occupancies are excluded (their start is fake).
+- `n_total, n_completed, n_open, n_left_censored` — so the censoring is visible.
+- `naive_avg_completed_dwell` — the biased number, kept for contrast.
+
+See [ADR-0008](../adr/0008-censoring-aware-read-models.md) for the why.
+
+## Business-metric layer (ADR-0009)
+
+The standard sales KPIs, built on a **curated stage taxonomy** — _not_ Twenty's option `position`, which mis-sequences the non-linear, two-phase pipeline (sales → delivery, plus terminal-lost and parked states).
+
+### `stage_dim` (table) — the curated dimension
+
+One row per stage: `sales_order` (the real forward ordinal), `zone` (`sales`/`delivery`/`lost`/`parked`), and `is_won`/`is_lost`/`is_parked`/ `is_terminal`. Seeded from the live Twenty schema. **Won-line: `is_won` = CONTRACTED or any later delivery stage** (replaces the old `'WON'` placeholder). Re-sync the seed if the workspace edits the `stage` option set.
+
+### `opportunity_current` (view)
+
+Latest record per deal, jsonb payload lifted into typed columns (stage, `amount` + `amount_currency`, `weighted_value`, `probability`, `deal_type` = MICE/FIT, `brand` = LUXURIQUE/LIBERTY, `pax`, `first_inquiry`, `loss_reason`). The "current attributes" companion to occupancy's stage _history_.
+
+### `opportunity_outcome` (view) — the spine
+
+Each live deal classified `won`/`lost`/`open`/`parked`, joining current attributes to furthest stage progress (`ever_won`, `max_sales_order`, `is_post_contract_loss`). The other metric views sit on this.
+
+### Metric views
+
+| View | Answers | Notes |
+| --- | --- | --- |
+| `opportunity_win_rate` | won / (won+lost), sliced by deal_type × brand | grouping sets; open & parked excluded from denominator |
+| `opportunity_funnel_conversion` | how far deals get; step conversion | "reached S" = deepest stage ≥ S |
+| `opportunity_loss_analysis` | why & where deals die | `lossReason` × exit stage; multi-select fans out |
+| `opportunity_aging` | open deals stuck in-stage (to now()) | `is_stale` at 30d default; tune per stage |
+| `opportunity_weighted_pipeline` | open value & forecast | grouped by currency; reports value coverage |
+
+**Slicing:** only `deal_type` (MICE/FIT) and `brand` (LUXURIQUE/LIBERTY) are fully populated. `owner` (HM Owner) is set on 192 of 572 deals (34%, 2026-09-25) → no owner-level cuts yet. `closeDate` is unused → cycle time derives from `first_inquiry` + stage history.
+
+## Refreshing
+
+`opportunity_stage_occupancy` is the only materialized view; the others derive from it live. Refresh it (the transitions/KM views then reflect it immediately):
+
+```sql
+select refresh_projections();   -- plain REFRESH; transaction-safe, tiny lock
+```
+
+`refresh_projections()` is also what [`backfill.py --refresh`](backfill.md) and the optional `pg_cron` schedule (commented in the migration) call.
+
+## Access & security (ADR-0010)
+
+The whole analytics surface is **service-role-only**. Every view is created `with (security_invoker = on)` so it runs as the caller and honours the base tables' RLS (not the owner's), and `anon`/`authenticated` have their grants **revoked** on the views, the base tables, and the `opportunity_stage_occupancy` matview. Capture/backfill are unaffected — both write with the service-role key, which bypasses RLS. A new sensitive view should follow suit: create it `with (security_invoker = on)` and revoke the API roles (Supabase default privileges re-grant them on every new `public` object). See [ADR-0010](../adr/0010-lock-analytics-surface-to-service-role.md).
+
+## Gotchas
+
+- A view is only as complete as the ledger. Run the [backfill](backfill.md) to seed a t=0 baseline (ADR-0007) — without it, pre-capture deals are missing and their first stage leg is absent.
+- `dwell` of open intervals is measured to the **last refresh**, not wall-clock now (except `opportunity_aging`, which measures to `now()` deliberately).
+- The won-line lives in `stage_dim.is_won` (CONTRACTED+), not a `'WON'` placeholder. To change what counts as won, edit that one column.
+- **Pre-capture lost deals have no funnel/exit-stage history.** Deals already terminal at the [backfill](backfill.md) t=0 were seeded straight at `LOST`/ `REJECTED`, so they show `exit_stage = '(unknown)'` and are absent from the early funnel. This is honest (their pre-loss path was never observed) and self-heals as live transitions accrue. See [ADR-0009](../adr/0009-curated-stage-taxonomy-and-business-metrics.md).
+- Another object's read model follows this same pattern — no change to `activity_log`.

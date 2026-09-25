@@ -1,0 +1,21 @@
+---
+title: "Component: fetch-twenty-schema.py"
+sidebarTitle: "Fetch Twenty Schema"
+description: "Pointer to the Twenty sibling repo where the GraphQL introspection fetcher and schema dumps were consolidated on 2026-06-30."
+---
+
+> **Moved 2026-06-30.** The fetcher and schema dumps have been consolidated into the dedicated `Twenty/` sibling repo. This page is a pointer; inbound links from `architecture.md`, `components/README.md`, and `adr/0006` continue to work here.
+
+## Where to find it now
+
+| Artifact | Location |
+| --- | --- |
+| Fetcher script | [`../../../Twenty/scripts/fetch-twenty-schema.py`](../../../Twenty/scripts/fetch-twenty-schema.py) |
+| Schema dumps (`introspection.json`, `data-introspection.json`, `metadata-schema.json`) | [`../../../Twenty/schemas/twenty/`](../../../Twenty/schemas/twenty/) |
+| Twenty repo context | [`../../../Twenty/CLAUDE.md`](../../../Twenty/CLAUDE.md) |
+
+## What it does (summary)
+
+Introspects both Twenty GraphQL endpoints (`/metadata` admin API and `/graphql` runtime data API) and writes three JSON dumps to `schemas/twenty/` in the `../../../Twenty/` repo. Run on demand to keep slugs accurate after any Twenty object/field changes.
+
+See the `../../../Twenty/` repo for full usage, configuration, and gotchas.

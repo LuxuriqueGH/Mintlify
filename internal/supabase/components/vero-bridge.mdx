@@ -1,0 +1,207 @@
+---
+title: "Component: Vero bridge (vero-push / vero-webhook / vero-processor)"
+sidebarTitle: "Vero Bridge"
+description: "Two-way bridge between Twenty (consent ledger) and Vero (send engine). Replaced RudderStack RETL. Includes push, webhook, processor, and slack-actions edge functions."
+---
+
+**Files:** [`supabase/functions/vero-push/index.ts`](../../supabase/functions/vero-push/index.ts), [`supabase/functions/vero-webhook/index.ts`](../../supabase/functions/vero-webhook/index.ts), [`supabase/functions/vero-processor/index.ts`](../../supabase/functions/vero-processor/index.ts), [`supabase/functions/slack-actions/index.ts`](../../supabase/functions/slack-actions/index.ts), [`supabase/functions/_shared/vero.ts`](../../supabase/functions/_shared/vero.ts), [`supabase/functions/_shared/slack.ts`](../../supabase/functions/_shared/slack.ts), [`supabase/migrations/20260825140000_vero_bridge.sql`](../../supabase/migrations/20260825140000_vero_bridge.sql), [`supabase/migrations/20260904120000_slack_approve_buttons.sql`](../../supabase/migrations/20260904120000_slack_approve_buttons.sql) **Related:** [ADR-0040](../adr/0040-vero-supabase-symmetric-bridge.md), [ADR-0039](../adr/0039-marketing-synced-surface.md), design contract `../../../Vero/SPEC.md`, build plan `../../../Vero/docs/plans/2026-08-25-v2-build-plan.md`
+
+> **Build state:** COMPLETE — all 10 chunks DONE 2026-08-28 (`Vero/docs/LEDGER.md`); loop proven at T9, teardown executed at T10.
+
+## What it is
+
+The two-way bridge between Twenty (the consent ledger) and Vero (the send engine). Replaced RudderStack RETL, which could carry only the outbound leg (Vero is destination-only there — no return path exists); RETL and the direct-SQL reader were torn down 2026-08-28 (`20260828150000_retire_retl_and_vero_ro.sql`) — `marketing.synced()` has no external SQL reader, service-role edge functions only.
+
+```text
+OUT  (every 5 min + weekly full state assert):
+  marketing.synced() ── vero_push_source() ──> vero-push ── diff vs vero_push_state ──> Vero
+                                                    users/track upserts; users/unsubscribe on
+                                                    revoked transitions; users/delete on
+                                                    vanished rows (symmetric mirror, guarded);
+                                                    users/resubscribe on revoked -> SUBSCRIBED
+                                                    (Twenty is the truth, both directions)
+BACK (continuous):
+  Vero Reporting Webhook (unsigned, never retried, 5s window)
+    ──> vero-webhook (capability-URL auth) ── durable insert ──> vero_events
+    ──> vero-processor (cron, claim + drain)
+          ├─ STATE  (unsubscribed/resubscribed/hard bounce) ──> Twenty person
+          │         marketingEmailStatus + marketingStatusChangedAt (machine-owned)
+          └─ TELEMETRY (sent/delivered/opened/clicked/…) ──> Twenty campaign +
+                    campaignEngagement records (projection — recomputed, never incremented)
+  loop closes: Twenty webhook ──> activity_log ──> person_current ──> marketing.synced()
+```
+
+## Tables (all `public`, service-role only, anon/authenticated revoked)
+
+| Table | Class | Role |
+| --- | --- | --- |
+| `vero_events` | work queue + raw ledger (**mutable by design** — not `activity_log`) | webhook inbox; dedupe on `dedupe_key`; `status` pending → done/failed/skipped |
+| `vero_push_state` | mutable bookmark (`reconcile_state` class) | last pushed trait hash + status per person; vanish debounce (`missed_ticks`, `gone_at`) |
+| `vero_bridge_heartbeat` | heartbeat | `last_run_at` vs `last_ok_at` per function — a run that 401s every Vero call keeps `last_run_at` fresh but not `last_ok_at` |
+| `vero_bridge_overrides` | approval ledger | one unconsumed row releases ONE tick of one guard; expires after 1 hour (ADR-0044) |
+| `vero_alert_mutes` | mute ledger | while `until` is in the future, halt alerts for that `[VB-xx]` code are logged, not posted (ADR-0044) |
+
+## RPCs (SECURITY DEFINER, service-role execute only)
+
+| RPC | Purpose |
+| --- | --- |
+| `vero_push_source()` | reads `marketing.synced()` without exposing the `marketing` schema to PostgREST |
+| `vero_email_ever_revoked(text)` | email-level consent floor: has this ADDRESS ever carried a revoked status under any person id (merges/recreates) |
+| `vero_claim_events(int)` | queue claim, `FOR UPDATE SKIP LOCKED`; 15-min abandoned-claim reclaim; increments the `claims` poison-pill counter |
+| `vero_state_high_water(uuid, text)` | newest DONE state event per person/email — the ordering guard |
+| `vero_grant_override(text, text, text)` | grant a Slack approval for one guard; idempotent — a second click returns the existing unconsumed, unexpired id |
+| `vero_consume_override(text, text)` | consume ONE approval, `FOR UPDATE SKIP LOCKED`; returns null when none is live |
+| `vero_alert_muted(text)` | true while that alert code is muted; read by `alert()` on halt alerts only |
+
+## Cron (all Vault-gated on `vero_bridge_secret` — the arming switch)
+
+| Job | Schedule | Fires |
+| --- | --- | --- |
+| `vero-push` | `*/5 * * * *` | diff push |
+| `vero-push-weekly` | `0 18 * * 0` | full re-push (`{"full":true}`) — heals Vero-side drift the diff is blind to |
+| `vero-processor` | `2-57/5 * * * *` | queue drain (offset 2 min after push) |
+| `vero-bridge-liveness` | `*/15 * * * *` | Slack dead-man when either `last_ok_at` is older than 30 min |
+
+## Ingest behavior (`vero-webhook`, LIVE since 2026-08-26)
+
+Auth → size cap → sanitize → parse → durable insert → empty 200. Contracts other components rely on:
+
+- **Only a dead database loses an event.** Unparseable/garbage bodies are stored as `event_type='unparsed'`, `status='skipped'`, `last_error` set; a catch-all wraps the whole handler and stores the sanitized body as `unparsed` on ANY throw — including a failed primary insert (those rows are the manual-replay path). A 500 means both inserts failed.
+- **`sanitizeJson`** (in `_shared/vero.ts`): NUL and lone surrogates → U+FFFD in every string and object key — Postgres jsonb/text reject both, and the raw bytes survive `JSON.parse`. Applied to the payload and to stored raw bodies.
+- **`user_email` is lowercased inside `parseVeroEvent`** — every consumer inherits the `vero_events` check-constraint rule; no call-site lowercasing.
+- **`event_at` is clamped**: numbers >1e12 read as unix ms (else seconds); results outside `[2000-01-01, received+5min]` → null. A clamped-out stamp degrades to received-time ordering downstream (`coalesce(event_at,
+  received_at)`), so a forged or unit-shifted timestamp can never poison `vero_state_high_water`.
+- **Dedupe keys**: timestamped shapes = `sha256(rawBody)`; timestamp-less shapes (`resubscribed`, `converted`, `failed` samples) fold the received second via `unparsedDedupeKey()`. Correction to the migration comment's blanket claim: timestamp-less keys ARE predictable per-second — the blast radius is one swallowed duplicate of identical content, not state loss.
+- **Bounds**: 256 KB body cap (413, post-auth, length-only log); `campaign_id` only from string/number, >512 chars → null; `type` >100 chars → unparsed.
+- **Logs are PII-free**: never the body, never the token or URL; insert errors log message + `event_type` + `dedupe_key` only.
+
+## Push behavior (`vero-push`, LIVE — armed 2026-08-27 at T8)
+
+Auth (`x-vero-bridge-secret`, hashed constant-time compare) → heartbeat → paged reads → diff → mass-vanish guard → capped, compliance-ordered calls. Contracts other components rely on:
+
+- **Vero call FIRST, shadow commit AFTER** — a crash between them repeats the idempotent call next tick. Per-row isolation: one failed row never blocks the rest, and its shadow is not advanced.
+- **Reads are paged** past PostgREST `max_rows` (1000) in `person_id` order — a silently truncated read is indistinguishable from a mass vanish.
+- **Vanish fail-safe = `users/delete` (2026-08-27 ruling: symmetric mirror — a person outside `synced()` must not exist in Vero; supersedes the unsubscribe fail-safe).** Irreversible, so it fires only after ALL of: the time-based debounce (`missed_ticks >= 1` AND ≥4 min since `missed_since` — a bare counter collapses when two invocations land close together; manual invocations still advance the counter, don't curl the function while the source is momentarily empty); an in-flight check (any pending `vero_events` row for the person defers the delete a tick, heartbeat note `deferred=N`); and a fire-time membership re-read of `vero_push_source()` (reappeared → abort). `users/delete` 404 counts as done (idempotent retry). Every executed delete alerts (VB-05 — the irreversible call is never silent); a deferral outliving 1h of absence escalates VB-06 each tick. Reappearance after `gone_at` recreates full state from Twenty: track + resubscribe (VB-03) or track + unsubscribe (VB-04) — suppression cannot "stand" through a delete.
+- **Call cap 200/run, compliance-first**: when the cap bites, actions run in order suppress → vanish_delete → resubscribe → track — trait freshness is deferred, never suppression. Zero-cost bookkeeping (vanish_count, reset_miss) always runs. Capped `full` runs rotate oldest-push-first, so consecutive weekly heals cover the whole audience.
+- **Twenty is the sole truth, both directions (2026-08-26 ruling):** a revoked → SUBSCRIBED transition auto-calls `users/resubscribe` (verified idempotent, 200 no-op on unknown ids). SUBSCRIBED only ever reaches Twenty via a human grant or the processor mirroring the person's own Vero resubscribe — Vero is a copy that follows.
+- **Weekly `{"full":true}` run is a full state ASSERT** — every row re-tracked AND its state re-applied (suppress revoked / resubscribe live), healing all Vero-side drift: deleted profiles, manual Vero edits, lost webhooks, the crash residual.
+- **Consent history check keys off `isNew` alone** — `diffPush` never emits `track(isNew)` for a currently-revoked row (those seed as suppress). A new person whose ADDRESS carries revoked history is tracked per Twenty's status
+  - a human-review notice (truth ruling; formerly auto-suppressed).
+- **Logs are PII-free and secret-free**: Vero response bodies never logged (a 4xx echo can carry submitted traits); every log line passes `errText()` (message-only + token/webhook-URL redaction); all lines prefixed `vero-push:`.
+
+## Drain behavior (`vero-processor`, LIVE — armed 2026-08-27 at T8)
+
+Auth (same bridge-secret gate) → heartbeat → claim (`vero_claim_events`, 200 cap) → **state first, telemetry after** (SPEC §3.3). Contracts other components rely on:
+
+- **Release decrements `claims`** — every deliberate release (pair-cap overflow, LIMIT_REACHED halt, flip-cap trip, superseded state events) restores the counter, keeping the invariant \`claims ≈ attempts + backoffs
+  - 1`. The poison-pill sweep trips only when claims outrun
+    `attempts + backoffs\` by >3 (a real crash loop), never on routine releases.
+- **State path**: one Twenty write per person per tick — newest event wins (person key is email-first; `user.id` can be non-UUID). Ordering guard vs the `coalesce(event_at, received_at)` high water; a stale-skipped group containing a revocation alerts (a silently dropped unsubscribe is invisible on a compliance path). Flip cap runs before any write; a tripped cap releases everything and alerts (rotate `VERO_WEBHOOK_TOKEN`, inspect `vero_events`).
+- **Outage-aware failures**: network / 5xx / 408 / 429 / LIMIT_REACHED are retryable — backoff (5 min doubling, cap 80) with **no strike**; LIMIT_REACHED halts all further Twenty calls that tick. 5 non-retryable strikes → `failed` + alert. Trashed records are detected on Twenty's exact `A duplicate entry was detected` constant → `skipped` + alert (restore the record in Twenty).
+- **Telemetry**: coalesced per (campaign, person), 50 pairs/tick, written via batched `createCampaignEngagements` upsert (per-pair fallback isolates a poison pair). Engagement is a **projection** recomputed from ALL events ever received for the pair (failed/skipped rows included — a failed mutation is still a received fact); both projection reads paginate past PostgREST's 1000-row cap.
+- **`last_ok_at` freezes on any attempted-call failure** (LIMIT_REACHED included) — a rotated `TWENTY_API_TOKEN` surfaces via the dead-man. Guard trips and the poison sweep attempt no call, so they stay ok (visible via Slack + heartbeat `note` instead).
+- **Alerts are leak-safe**: Twenty error text never reaches Slack (its validators echo submitted emails and raw pg errors leak schema names) — full text stays in `last_error` (service-role only). Alert fan-out capped (3 verbatim + "+N more"); campaign/engagement names capped at 200 chars.
+
+## Guards (SPEC §§2–3 — compliance controls, pure functions in `_shared/vero.ts`)
+
+- **Mass-vanish cap** `> max(5, 10%)` absent rows → halt + alert, no calls at all (since the 2026-08-27 delete ruling this guard stands between a broken read and irreversible audience-wide deletion). The halt still writes `last_ok_at` (deliberate: the guard alert must not drag the dead-man alert in behind it) — a tripped guard is visible in Slack + the heartbeat `note`, not via the dead-man.
+- **Flip cap** `> max(5, 10%)` status flips per tick → halt + alert.
+- **Bulk status edits are UNGUARDED by ruling (2026-08-26)** — a Twenty edit is the truth however many rows it touches; a push-side flip cap was rejected. Remedy for a mistaken bulk edit: edit Twenty back, the mirror re-follows.
+- **Vanish debounce + pre-delete checks** — a second invocation + ≥4 min elapsed before the fail-safe `users/delete`; then an in-flight `vero_events` check (pending rows defer the delete a tick) and a fire-time membership re-read (reappeared → abort).
+- **Delete-resurrect gate (processor)** — before a state write, the processor reads the person's `vero_push_state.gone_at`; set → the event is skipped ("person deleted from Vero"). A late-delivered or human-reset pre-delete event must not resurrect a status Twenty deliberately cleared (ADR-0041). Fails closed: an unreadable shadow retries, never writes.
+- **Ordering** — state writes gated on `event_at` newer than the high water; stale events skip.
+- **Consent history check** — `vero_email_ever_revoked()` flags track-side resurrection of a revoked address for human review (notice only since the 2026-08-26 truth ruling; Twenty's current status wins).
+- **Resubscribe mirrors Twenty** (2026-08-26 ruling, supersedes never-resubscribe) — revoked → SUBSCRIBED transitions and weekly full asserts call `users/resubscribe`; a non-revoked row reappearing after the vanish fail-safe is auto-resubscribed + noticed.
+- **Projection, not increment** — engagement counts recomputed from the full event set each write.
+- **Strikes** — 5 non-retryable failures → event `failed`, alert; `backoffs` grow retry delay without striking.
+
+**Both cron functions**: write `last_ok_at` on every non-crash exit, guard trips included — only attempted-call failures freeze it (both implement this).
+
+**Alert format**: every Slack alert opens `[VB-xx]` + one plain-English sentence + a `Next:` step — full detail per code in [`../error-codes.md`](../error-codes.md) (Sasha convention, 2026-08-27).
+
+**Drill record (T8, 2026-08-27 — teardown-gate items 4 + 5):**
+
+- **Dead-man (item 4): FIRED.** Heartbeats backdated 2h at 01:29:40 UTC; the 01:30:00 liveness tick posted the STALE alert to #pipeline-alerts (observed 10:30 JST). Fn ticks self-healed the heartbeats. Timing note for re-drills: fn ticks overwrite `last_ok_at` within ≤5 min, so backdate just before a :00/:15/:30/:45 boundary — the liveness read beats the colliding push tick's ~2s HTTP round trip.
+- **Mass-vanish (item 5): FIRED.** 6 synthetic rows inserted into `vero_push_state`; the 01:35 push tick tripped the guard (alert observed 10:35 JST; note `guard=mass_vanish absent=6 live=9`), zero Vero calls. Rows deleted; the 01:40 tick ran clean (`actions=0 calls=0`).
+- Bonus, unplanned: the arming tick itself proved the full loop live — first-sight suppression of the pre-existing UNSUBSCRIBED person → Vero fired a real `unsubscribed` webhook back → processor applied the echo to Twenty. Claims-decrement also verified live (canned events: claim→release→claim→skip left `claims=1`).
+
+**E2E campaign proof (T9, 2026-08-28 — teardown-gate items 1–3):**
+
+- **Item 3 (telemetry): PASS.** Sasha sent broadcast `1421972` ("Test Broadcast", audience = 1 SUBSCRIBED person, trait-filtered) at 04:48 UTC. Processor created `campaign` `dac6ad84` + engagement (`sentAt` 04:48:40, `deliveredAt` 04:48:46, `status DELIVERED`); the `opened` event (04:52, images enabled — Outlook blocks the pixel by default) landed as `openedCount 1, status OPENED, lastOpenedAt 04:52:06` on the 04:57 tick. Second broadcast `1425108` ("[Copy] Test Broadcast", engagement `84b974f5`) proved per-campaign isolation (`openedCount 3` from proxy re-fires). Idempotence: broadcast 1's engagement unchanged across later ticks with no new events.
+- **Item 1 (Vero-side unsubscribe round trip): PASS.** Unsubscribe link click 04:58:50 (`{{url.unsubscribe_link}}` — the template's button had to be wired to it; buttons aren't auto-linked) → `unsubscribed` in `vero_events` → Twenty `UNSUBSCRIBED` + `marketingStatusChangedAt
+  04:58:47` → 05:05 push tick echoed (`actions=1 calls=2`, `vero_push_state.last_status = UNSUBSCRIBED`).
+- **Item 2 (Twenty-side revocation lands in Vero): PASS.** Plan deviation: single-person variant instead of a second test person — Sasha flipped himself SUBSCRIBED in the Twenty UI (proving the auto-resubscribe echo: push `users/resubscribe` 06:05 → Vero fired `resubscribed` back → processor stamped Twenty 06:07), then UNSUBSCRIBED (~06:24; a first attempt didn't save in Twenty — stale UI edit, record still read SUBSCRIBED — bridge unaffected). Captured 06:27, pushed on the 06:25/06:30 ticks: `last_status = UNSUBSCRIBED`, Vero profile suppressed (Sasha-confirmed), 06:30 tick `actions=0` (converged).
+- No webhook payload diffs vs `Vero/docs/webhook-payloads.md` (zero `unparsed` rows from the live campaign).
+- **All five teardown-gate checks (SPEC §8) are now recorded** — items 4+5 in the T8 drill record above. T10 may start.
+
+**Processor contract** (written into the claim function's comment; the processor must obey it): set `claimed_at = null` on every non-crash outcome (the claim predicate ANDs its release conditions — leaving it set floors every backoff at 15 min); fail a row whose `claims` counter keeps growing (a crash never increments `attempts`); compare ordering against `coalesce(event_at, received_at)` (resubscribed carries no event timestamp). The 15-min abandoned-claim window is safe only because the edge runtime's max duration is far below it — raising the function timeout means raising this interval.
+
+## Secrets (names only — values live in the platform)
+
+- **Edge secrets** (`npx supabase secrets set`): `VERO_AUTH_TOKEN`, `VERO_WEBHOOK_TOKEN` (capability-URL token), `VERO_BRIDGE_SECRET`, `ALERTS_SLACK_WEBHOOK`, `SLACK_SIGNING_SECRET` (the "Twenty Bot" Slack app's signing secret — the same app owns the alerts incoming webhook and the Interactivity Request URL), existing `TWENTY_API_TOKEN`.
+- **Vault** (SQL editor, one time): `vero_bridge_secret` (must equal the `VERO_BRIDGE_SECRET` edge secret — **creating it is the arming step**, Task 8), plus existing `project_url`, `alerts_slack_webhook`.
+- Generate tokens with `openssl rand -hex 32`. The webhook token rides in the URL (Vero cannot sign) — accepted exposure class per SPEC §7; **rotation = set new `VERO_WEBHOOK_TOKEN` → update the Vero webhook URL**, with no send in flight.
+
+## Operator rules (SPEC §5, rewritten by the 2026-08-26 truth ruling)
+
+- **Manage subscription state in Twenty, never in the Vero UI.** Flipping `SUBSCRIBED` in Twenty resubscribes the person in Vero automatically — whoever flips it is asserting the person asked for it (Twenty records who).
+- **If Twenty says SUBSCRIBED but no sends arrive, check the person's Vero suppression state** — a drifted copy heals at the next transition or the weekly state assert, or immediately by re-saving the person in Twenty.
+- **Clearing `marketingEmailStatus` to NULL, or deleting the person, DELETES their Vero profile** (2026-08-27 ruling: outside `marketing.synced()` = must not exist in Vero — profile, history and suppression entry all removed, after the debounce + in-flight + membership checks). Use NULL/delete to mean "remove from marketing entirely" (incl. privacy purges — no manual Vero cleanup needed); use `UNSUBSCRIBED` to mean "keep the record, never send". Re-granting a status later recreates the Vero profile from Twenty state (VB-03/VB-04).
+
+## Slack approve buttons (`slack-actions`, LIVE since 2026-09-04)
+
+Three halt guards used to need a hand-written SQL statement to release them. Each one now posts its alert with Block Kit buttons. A click goes to the `slack-actions` edge function, which verifies the Slack signature, writes one row, and edits the message in place.
+
+```text
+vero-push / vero-processor                         Slack #pipeline-alerts
+   guard trips ──► alert(level, text, buttons) ───► message with buttons
+                                                          │ click
+                                                          ▼
+                                            slack-actions (edge function)
+                                              verify signature (v0, 300 s window)
+                                              dispatch on action_id
+                                              write ──► vero_bridge_overrides
+                                                    ──► vero_alert_mutes
+                                                    ──► vero_events (poison)
+                                              POST response_url, then 200
+                                                          │
+   next tick: guard consumes the override ──► proceeds ONCE
+              alert() finds a mute        ──► logs only
+```
+
+| Code | Button | `action_id` | Effect |
+| --- | --- | --- | --- |
+| VB-13 | Approve release (primary) | `approve_flip_cap` | `vero_grant_override('flip_cap', ...)` |
+| VB-01 | Approve deletes (danger, confirm dialog) | `approve_mass_vanish` | `vero_grant_override('mass_vanish', ...)` |
+| VB-12 | Retry events (primary) | `poison_retry` | `vero_events` back to `pending`, counters zeroed |
+| VB-12 | Discard events (danger, confirm dialog) | `poison_discard` | `vero_events` to `skipped` |
+| all three | Mute 24h | `mute` | upsert `vero_alert_mutes` for that code |
+
+Contracts other components rely on:
+
+- **One approval releases ONE tick, and dies after one hour.** The consume is a single `FOR UPDATE SKIP LOCKED` update, so two ticks can never share it, and an approval nobody uses within the hour expires unused.
+- **The guard formulas do not change.** `overCap` stays `n > max(5, 10%)`. An override skips the halt for one tick; it never widens a cap.
+- **An override never approves a single delete.** On the push side the tick continues into the action loop, where the debounce, the in-flight `vero_events` check and the fire-time membership re-read all still run.
+- **Both guards fail CLOSED on an unreadable override table** — they halt. `alert()` fails OPEN on an unreadable mute table — it posts. A repeat alert is a nuisance; a swallowed halt alert is an invisible outage.
+- **Mutes are read inside `alert()`, for halt alerts only.** Notices and infos never mute. The code is read from the alert's own first line (`[VB-xx]`).
+- **The click is authenticated, not the caller.** `slack-actions` verifies `v0=HMAC-SHA256(signing secret, "v0:<timestamp>:<raw body>")` with a constant-time compare and rejects a timestamp more than 300 s from now. A body over 256 KB is rejected with 413 before the signature is verified — the same cap `vero-webhook` uses. An unset `SLACK_SIGNING_SECRET` rejects every request. Any member of #pipeline-alerts may click; there is no allow-list (Sasha, 2026-09-04).
+- **The reply is posted before the 200.** One database write plus one `response_url` POST finishes inside Slack's 3-second window, and the edge runtime may cut off work left for after the response.
+- **`slack-actions` logs `action_id`, the code, the Slack user id and row ids.** Never the payload body, never an email.
+- **Poison buttons carry the full swept id list**, trimmed only if the JSON would pass Slack's 2000-character `value` cap. The Discard confirm dialog states the count the button actually carries — the trimmed head — not the full sweep count. Both arms filter on `status = 'failed'`, so a row somebody already repaired is untouched and the reply says "Nothing to change".
+
+**Deploy order for any future redeploy:** migration → `slack-actions` → `vero-processor` → `vero-push`. A function deployed before `slack-actions` posts buttons whose clicks fail. A function deployed before the migration halts (the override read fails closed) and posts normally (the mute read fails open).
+
+**Live proof (2026-09-04, the 39 held events):** the 01:57 UTC processor tick posted `[VB-13]` with both buttons. Approve release was pressed at 01:57 UTC by `@sasha.s`; the message was replaced in place with "Approved by @sasha.s at 01:57 UTC. The next tick releases it." Override row 3 was granted with `consumed_at` null and `expires_at` one hour out, and the 02:02 UTC tick consumed it (`consumed_note` `flips=39 audience=291`), posted `[VB-16] Approved release used`, and wrote heartbeat note `guard=flip_cap override=3 halted=false state_applied=39
+state_skipped=0 pairs_written=0 released=0 poisoned=0 unparsed=0
+call_failures=0 mark_failures=0`. The 39 events ended `done`, and no unconsumed approval was left standing. Mute is proven by the unit tests and the migration self-test; no live mute drill was run.
+
+## Gotchas / limits
+
+- **Vero never retries a webhook.** A 500/outage during delivery is a permanently lost event. State converges anyway (weekly full re-push + Vero's own suppression list); telemetry gaps are irreducible. Drift check is manual at first (SPEC §6).
+- **`users/track` 2xx ≠ verified** — an accepted write and a silently-ignored stale write are indistinguishable (`webhook-payloads.md`); 2xx means "delivered to Vero" only. The weekly full re-push is the drift healer.
+- **Engagement upserts echo into `activity_log`** (~2–3k envelopes per full-list campaign) via the normal Twenty webhook — append-only, no erasure. Accepted capture noise (ADR-0040).
+- **Write-side renames alert by failing**: if Twenty renames `marketingStatusChangedAt`/`campaign`/`campaignEngagement` fields, processor writes strike + alert. Only the read side (`marketing.synced()` keys) sits under the `schema_drift()` watch.
+- Twenty rate limit surfaces as `LIMIT_REACHED` in the GraphQL error body at HTTP 200; the WAF 403s non-browser User-Agents.
+- **Idle ticks keep the dead-man green** — `last_ok_at` is written when zero calls were attempted, so a rotated Vero token stays invisible until the first real action. The weekly full re-push doubles as the token liveness prober (worst-case blind window ≤7 days, with nothing pending to lose).
+- **A dead Slack webhook silences the whole alerting stack** (guard trips, dead-man, drift — all ride the same `alerts_slack_webhook`). vero-push logs a rejected Slack POST; there is no secondary channel. Pre-existing class, applies to reconcile too.
+- **Vero-side audience filtering is the sole send-time control while the unsubscribe leg is broken**: if `users/track` succeeds but `users/unsubscribe` persistently fails, the person exists in Vero mailable until healed — only the broadcast/journey audience filter on `marketing_email_status = SUBSCRIBED` holds the compliance floor. Verified as an explicit item at T9, not assumed (SPEC §5).

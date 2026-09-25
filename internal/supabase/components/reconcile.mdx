@@ -1,0 +1,88 @@
+---
+title: "Component: reconcile (scheduled dropped-webhook reconciler)"
+sidebarTitle: "Reconcile"
+description: "pg_cron-scheduled edge function that recovers dropped Twenty webhooks via incremental updatedAt delta every 10 minutes, plus hourly delete sweep."
+---
+
+**File:** [`supabase/functions/reconcile/index.ts`](../../supabase/functions/reconcile/index.ts) **Related:** [ADR-0023](../adr/0023-scheduled-incremental-reconcile-edge-function.md), [ADR-0042](../adr/0042-reconcile-delete-sweep.md), [ADR-0047](../adr/0047-reconcile-logs-replay-trial.md), [ADR-0007](../adr/0007-historical-backfill-snapshot.md), [ADR-0004](../adr/0004-idempotency-dedup-key.md)
+
+## What it is
+
+**pg_cron** fires this edge function at 10-minute intervals. The function collects the changes that Twenty did not supply. Twenty tries about 4 times, then it stops. Twenty has no dead-letter queue.
+
+The default mode is the `updatedAt` snapshot delta (ADR-0023). ADR-0042 adds the delete sweep (`?mode=deletes`). ADR-0047 added a Logs replay (`?mode=logs`). It was the default from 2026-09-11 to 2026-09-16. The trial found two defects. Thus the delta became the default again. The Logs replay mode was removed on 2026-09-25 (`supabase-073`, ADR-0047 addendum).
+
+Split of the work: **`backfill.py`** = one-time t=0 backfill + deep audits; **`reconcile`** = forward-only recovery of the changes that did not arrive.
+
+The function accepts two values of `?mode=`: `delta` and `deletes`. An unknown value returns `400` with the body `unknown mode`. The removed value `logs` is an unknown value. A request without `?mode=` runs `delta`.
+
+## Auth
+
+The deploy sets `--no-verify-jwt`. The function gates on the `x-reconcile-secret` header that the cron sends. It compares the two hashes in constant time. Thus the content and the length of the secret do not leak. It closes the gate if `RECONCILE_SECRET` has no value.
+
+## Delta mode (`?mode=delta`, default — ADR-0023)
+
+1. The function introspects `/graphql` and lists the business objects from `/metadata`. It builds each object's field selection dynamically, with the same logic as `backfill.py`.
+2. For each object it reads the watermark from `reconcile_state`. It then queries the records with `updatedAt >= watermark - overlap`, ordered by `updatedAt, id`.
+3. It maps each record to a `snapshot` row. It inserts the rows in batches with `ON CONFLICT DO NOTHING`.
+4. It advances the object's watermark with `advance_reconcile_watermark()`.
+
+Per-object error isolation: the function logs a failed object, reports it in `failed_objects`, and skips it. The watermark of that object stays put. The delta reads the current state only: two changes between runs collapse to the last one.
+
+## Delete sweep (`?mode=deletes`, hourly — ADR-0042)
+
+The delta is blind to deletions: it only sees records that still exist outside Twenty's trash, so a dropped `*.deleted`/`*.destroyed` webhook left a permanent ghost in the ledger (found live 2026-08-28 — a ghost person in `marketing.synced()`). A third cron job, **`reconcile-deletes`** (`41 * * * *`, same Vault-gated pattern and secret), fires the same function with `?mode=deletes`. Per business object:
+
+1. `reconcile_ledger_alive(object)` RPC → ids the ledger believes alive (latest event: action not `deleted`/`destroyed`, `deletedAt` null). Returns `uuid[]` in one value — a set return would be silently truncated at PostgREST's max-rows (1000; `company` alone exceeds it).
+2. Existence check against Twenty in `id IN (...)` batches of 60, paced 150 ms (rate budget shared with the delta). Misses are re-checked against the trash (`deletedAt: { is: NOT_NULL }`).
+3. **In trash** → synthetic `deleted` event from the real trash record (`happens_at` = its true `deletedAt`; dedup `reconcile-deleted|obj|id|deletedAt`). **Gone** → synthetic `destroyed` event: last-known ledger record (`reconcile_last_records()` RPC) with `deletedAt` stamped to sweep time (dedup `reconcile-destroyed|obj|id`, stable — one synthetic destroy ever per id).
+4. **Vanish guard:** more misses than `max(20, 5% of alive)` skips the object with a `failed_objects` entry — a broken read must not poison the append-only ledger with false destroys.
+
+The sweep does **not** heartbeat `reconcile_state` — the dead-man alert watches the 10-minute delta only. A restore whose `restored` webhook also drops un-ghosts only on the record's next edit (delta re-captures it).
+
+## Logs replay (`?mode=logs`) — removed 2026-09-25
+
+The Logs replay of ADR-0047 was removed on 2026-09-25 (`supabase-073`). The test period found that the replay writes a row before the late webhook row arrives, and that ClickHouse changes the payload. ADR-0047 and its addendum keep the record. The `reconcile_logs_captured` RPC stays in the database, and no code calls it. The facts about Twenty Logs are in `S-Drive/Twenty/CLAUDE.md`.
+
+## Liveness (dead-man alert)
+
+pg_net is fire-and-forget: the cron job looks green even if every run 401s or 500s, so a dead backstop would otherwise be invisible. Two-part defence:
+
+- The function heartbeats `reconcile_state.last_run_at` per object on every successful pass (even when nothing changed).
+- A second cron job, **`reconcile-liveness`** (hourly), posts to the `#pipeline-alerts` Slack channel (incoming-webhook URL in Vault as `alerts_slack_webhook`) when the newest heartbeat is older than **35 minutes** (3 missed 10-min fires) or the table is still empty after arming. It no-ops silently until both `alerts_slack_webhook` and `reconcile_secret` exist in Vault.
+
+A starving _single_ object (repeated per-object failure under isolation) stops heartbeating too. The rows of retired objects were deleted on 2026-09-24 (`supabase-063`). On 2026-09-25 all 26 rows of `reconcile_state` ran in the last 35 minutes, so the stale-object count in the alert reads zero. A non-zero count now points to a real problem.
+
+## Idempotency (why re-running / overlapping is safe)
+
+Delta rows: `dedup_key = sha256('snapshot|<object>|<id>|<updatedAt>')` — **byte-identical to `backfill.py`**, so the two reconcilers and the overlap window never double-count. Unchanged record → same key → ignored; `updatedAt` advanced (a missed webhook) → new key → inserted. The `overlap` re-scan (default 15 min) is therefore free and only guards the window boundary. A skipped run widens the next window; an aborted run is re-covered by the next fire — self-healing **once bootstrapped** (see enable order; the first-run lookback is only 60 min, so pre-arming history must come from the seed).
+
+## Configuration
+
+- **Secrets:** `TWENTY_API_TOKEN`, `RECONCILE_SECRET` (via `supabase secrets set`; generate with `openssl rand -hex 32` — ≥32 random bytes, never a hand-typed string); `SUPABASE_URL` / `SUPABASE_SERVICE_ROLE_KEY` auto-injected. The cron needs Vault secrets `project_url` and `reconcile_secret`; the liveness alert additionally uses `alerts_slack_webhook` (set once in the SQL editor — see the schedule migration header).
+- **Tunables (env):** `RECONCILE_OVERLAP_MIN` (default 15), `RECONCILE_INITIAL_LOOKBACK_MIN` (default 60, used only the first time a watermark row is missing) — both clamped to sane ranges (a typo degrades to the default, never to a broken window) — plus the cron expressions in [`20260701121000_schedule_reconcile.sql`](../../supabase/migrations/20260701121000_schedule_reconcile.sql).
+
+## Enable order (one time — order matters)
+
+> **Status: DONE — enabled + armed 2026-07-21; verified live (fresh `reconcile_state` heartbeats, cron 200s `ok: true`, `reconcile-liveness` dead-man alert active; re-verified 2026-07-23). Kept as the re-enable runbook.**
+
+Arming (step 4) must come **last**: the cron jobs no-op until the Vault secrets exist, and the function's first-run lookback is only 60 minutes, so the t=0 seed must already be in place when the first real fire happens.
+
+1. Deploy the function + edge secrets: `supabase functions deploy reconcile --no-verify-jwt`, then `supabase secrets set TWENTY_API_TOKEN=… RECONCILE_SECRET=…` (CSPRNG, ≥32 bytes).
+2. Apply the two migrations (`reconcile_state` + the cron schedule). Harmless while Vault is empty: every fire no-ops.
+3. Run `python scripts/backfill.py` once for the t=0 baseline.
+4. **Arm:** in the SQL editor, set Vault secrets `project_url` + `reconcile_secret` (and optionally `alerts_slack_webhook` for the liveness alert — a Slack incoming-webhook URL for `#pipeline-alerts`).
+5. **Verify (within ~15 min of arming):**
+   - `select * from reconcile_state order by last_run_at desc` — populated, fresh `last_run_at` for every business object;
+   - `select status_code, error_msg from net._http_response order by id desc limit 5` — 200s, no auth failures;
+   - edge-function logs show 200s with `"ok": true` and empty `failed_objects`.
+
+## Gotchas / limits
+
+- **Bootstrap horizon** — the first fire for an object with no watermark looks back only `RECONCILE_INITIAL_LOOKBACK_MIN` (60 min). Anything dropped earlier is captured only by the t=0 `backfill.py` seed — hence the enable order above. "Self-healing across an outage" holds **after** bootstrap.
+- **Delta mode is current-state only** — more than one change to a record between runs collapses to the last snapshot.
+- **Deletion recovery is hourly, not 10-minute** — the delta only sees records that still exist; a missed `*.deleted`/`*.destroyed` webhook is healed by the `reconcile-deletes` sweep (ADR-0042), so a ghost can live up to ~1 h.
+- **Not the ledger** — `reconcile_state` is mutable by design; never derive analytics from it.
+- Sends a browser-ish `User-Agent` (Twenty's WAF 403s the default runtime UA).
+
+**Last modified:** 2026-09-25 UTC. Second pass: the Liveness note no longer says the stale count is never zero (the retired rows were deleted on 2026-09-24). Cause: the doc-drift item of the 2026-09-25 backlog walk. Actor: Claude Opus 5.5 (fix agent). First pass the same day: the Logs replay mode (`?mode=logs`) is removed; the function has two modes. Cause: Sasha's ruling on `supabase-073` in the backlog review of 2026-09-25. Actor: Claude Opus 5.5 (fix agent S1). Before that, on 2026-09-16, the delta became the default mode again (ADR-0047).

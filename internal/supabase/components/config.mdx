@@ -1,0 +1,11 @@
+---
+title: "Component: config.toml"
+sidebarTitle: "Config"
+description: "Supabase CLI configuration that declares the webhook function runs without JWT verification."
+---
+
+**File:** `supabase/config.toml`
+
+The Supabase CLI config. Key setting: `verify_jwt = false` for the `twenty-webhook` function, because Twenty authenticates via HMAC signature rather than Supabase JWT.
+
+See the root [README.md](../../README.md) for quickstart commands that use this config.

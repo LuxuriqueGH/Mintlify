@@ -1,0 +1,59 @@
+---
+title: "Component: twenty-webhook (edge function)"
+sidebarTitle: "Twenty Webhook"
+description: "Supabase Edge Function that authenticates Twenty webhooks via HMAC, deduplicates events, and appends exactly one row per real event to the activity_log ledger."
+---
+
+**File:** [`supabase/functions/twenty-webhook/index.ts`](../../supabase/functions/twenty-webhook/index.ts) **Runtime:** Supabase Edge Function (Deno) · **Auth:** HMAC (no JWT) **Related:** [ADR-0004](../adr/0004-idempotency-dedup-key.md), [ADR-0005](../adr/0005-hmac-signature-verification.md), [ADR-0006](../adr/0006-system-wide-webhook-scope.md), [ADR-0036](../adr/0036-drop-formula-run-log-at-ingest.md), [ADR-0046](../adr/0046-ledger-scope-business-objects.md)
+
+## What it is
+
+The single ingest endpoint. Twenty POSTs a webhook here on every record create/update/delete; the function authenticates it, drops retries/dupes, and appends exactly one row to [`activity_log`](activity-log.md). Stateless — all state is in Postgres.
+
+## Responsibilities
+
+1. **Authenticate** — recompute `HMAC-SHA256(secret, \`$${timestamp}:$${rawBody}\`)`over the **raw** body and constant-time compare to`X-Twenty-Webhook-Signature`, and reject a timestamp more than 5 minutes from
+   now (replay window). Reject `401`on mismatch, missing signature, or stale/
+   invalid timestamp. **Fail closed:** an unset`TWENTY_WEBHOOK_SECRET`now
+   rejects too, unless the dev-only escape hatch`ALLOW_UNSIGNED=true\` is set.
+2. **Parse & validate** — `eventName` → `object` + `action`; require a `record.id`. Missing pieces → `200 "ignored"` (ack, don't trigger retries).
+3. **Drop sync objects** (ADR-0046) — an object with a `nameSingular` that starts with one of `INGEST_DROP_PREFIXES` (default `message,calendar,blocklist,callRecording`) is acked `200 "ignored: sync object"` and the function keeps no row for it. Twenty's inbox and calendar sync objects were 84% of ledger rows on 2026-09-11 and no consumer read them. The filter keeps these objects: `workflowRun`, `workflowVersion`, `workflowAutomatedTrigger`, `noteTarget`, `taskTarget`, `attachment`, `workspaceMember`. Set the env to `none` to disable the filter. Caveat: `messageCampaign` starts with `message`. The filter removes it too. If e-mail campaigns come into use, add a check on the full name in `scope.ts`.
+4. **Drop the formula app's run log** — a `formulaDefinition.updated` whose `updatedFields` is non-empty and contains **only** names from the set `lastEvaluatedAt`, `lastValue`, `lastValueText`, `updatedBy` is acked `200 "ignored: formula run-log"` and never stored. The set and the test are in `ingest.ts` and `ingest_test.ts`. `supabase-071` added the last two names on 2026-09-25. `lastEvaluatedAt` is a job clock stamp that moves on every pass even when nothing computed changed, and `lastValue` duplicates a value already logged on the target record. Everything else on `formulaDefinition` is kept — creates, deletes, config changes, and `lastError`. A null/empty `updatedFields` is never dropped (fail toward retention). See [ADR-0036](../adr/0036-drop-formula-run-log-at-ingest.md).
+5. **Dedupe** — `dedup_key = sha256(\`$${eventName}|$${recordId}|$${eventDate ?? record.updatedAt}|$${record.updatedAt}|\${sha256(record)}\`)`;
+   upsert with `onConflict: dedup_key, ignoreDuplicates: true`. `eventDate`is fixed
+   per *batch*, so`record.updatedAt`alone isn't enough either — two same-record
+   writes in one batch can still share an unchanged`updatedAt\`. Folding a hash of the record content keeps those distinct while true retries (identical body) still collapse. See [ADR-0004](../adr/0004-idempotency-dedup-key.md).
+6. **Stamp a bare destroy** (`supabase-050`, 2026-09-25) — a `destroyed` event with no `deletedAt` in its `record` (a destroy with no trash step first) gets `deletedAt` = `happens_at` (`withDestroyStamp` in `ingest.ts`). The reconcile delete sweep does the same for its synthetic destroys (ADR-0042). Each `*_current` view then removes the record, if it tests the action or `deletedAt`. A record that went to the trash first keeps its true `deletedAt`. The dedup key uses the record as Twenty sent it.
+7. **Insert** the envelope + full `record` jsonb via the service-role client.
+
+## Inputs
+
+- **HTTP** `POST` only (else `405`).
+- **Headers:** `X-Twenty-Webhook-Signature`, `X-Twenty-Webhook-Timestamp`.
+- **Body:** Twenty event `{ eventName, record, updatedFields, eventDate,
+  workspaceId, userId, workspaceMemberId, ... }`. No diff; `record` is the full **after**-snapshot. `userId`/`workspaceMemberId` are **null for API-key writes**.
+
+## Outputs
+
+- Row in `activity_log` (or silent no-op on duplicate).
+- **Response contract:** `200` ack · `401` bad signature · `400` bad JSON · `405` wrong method · **`500` on DB error so Twenty retries** (up to 3×).
+
+## Environment / secrets
+
+- `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY` — injected by Supabase.
+- `TWENTY_WEBHOOK_SECRET` — set via `supabase secrets set …`; never in code.
+- `INGEST_DROP_PREFIXES` — optional. Each value in it is the start of an object name that the filter removes. Divide the values with `,`. Default `message,calendar,blocklist,callRecording`. `none` disables the filter.
+
+## Deploy
+
+```sh
+npx supabase functions deploy twenty-webhook   # verify_jwt=false is in config.toml
+```
+
+## Gotchas
+
+- Verify against the **raw** body — never re-stringify before HMAC.
+- Return **5xx** (not 2xx) on transient DB errors, or Twenty won't retry.
+- `verify_jwt = false` means HMAC is the _only_ auth — never ship without the secret set.
+
+**Last modified:** 2026-09-25 UTC. The run-log set also holds `lastValueText` and `updatedBy`, in the new pure module `ingest.ts`; a bare destroy gets `deletedAt` (step 6). Cause: `supabase-071` and `supabase-050`. Actor: Claude Opus 5.5 (fix agent S1). Before that, on 2026-09-11: added the sync-object ingest filter (ADR-0046).

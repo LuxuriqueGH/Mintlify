@@ -1,0 +1,19 @@
+---
+title: "Twenty Schema Reference for SupplierDB"
+sidebarTitle: "Twenty Schema"
+description: "Twenty GraphQL schema introspection dumps and fetcher moved to the dedicated Twenty sibling repo. Relative navigation paths preserved."
+---
+
+# Twenty schema dumps moved → the `Twenty/` sibling repo
+
+The Twenty GraphQL introspection dumps and the `fetch-twenty-schema.py` fetcher were consolidated into the dedicated **Twenty** sibling repo on 2026-06-30. They are no longer duplicated here. (SupplierDB's own `scripts/build.py` is unaffected — it operates on `data/source/` → `data/out/`, not these dumps.)
+
+From this folder (`SupplierDB/schemas/twenty/`) the sibling repo is three levels up:
+
+- Schema dumps: [`../../../Twenty/schemas/twenty/`](../../../Twenty/schemas/twenty/) — `introspection.json` (`/metadata`), `data-introspection.json` (`/graphql`, use for mutation inputs), `metadata-schema.json` (normalized per-object dump)
+- Fetcher: `../../../Twenty/scripts/fetch-twenty-schema.py`
+- Vendored Twenty source: `../../../Twenty/vendor/twenty/`
+
+**Refresh** — from `C:/Local-Env/Repos/S-Drive/Twenty` in PowerShell: `python scripts/fetch-twenty-schema.py` (reads that repo's `.env` → `TWENTY_API_TOKEN`).
+
+See [`../../../Twenty/CLAUDE.md`](../../../Twenty/CLAUDE.md) for the full Twenty reference.

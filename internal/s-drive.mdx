@@ -1,0 +1,38 @@
+---
+title: "S-Drive Workspace Quickstart"
+sidebarTitle: "S-Drive"
+description: "Quickstart guide for the Luxurique S-Drive workspace. Covers the seven project trees, deploy targets, and how to work in the monorepo."
+---
+
+# Luxurique S-Drive — workspace quickstart
+
+This folder is the S-Drive tree of the Claude Code root `C:\Local-Env\Repos\`. Sessions start there with PowerShell `repo`. It holds seven project trees. Since 2026-09 they are folders of one git repo, `Luxurique/lux-monorepo`, together with `.claude/`, `qc-web/`, and `ste100/`. Each tree keeps its own deploy target and docs. `QuotationCostingEngine/` stays a separate repo.
+
+> Orientation + shared knowledge for agents: [`CLAUDE.md`](CLAUDE.md) (the authoritative map). This file is the human operator quickstart.
+
+## The seven trees
+
+| Tree | What it is | Deploys to |
+| --- | --- | --- |
+| [**Twenty**](Twenty/) | The CRM hub's own tree — canonical schema dumps, the schema fetcher, the vendored read-only Twenty source, Twenty docs. The schema source of truth every other tree reads. | (cloud SaaS — nothing to deploy) |
+| [**n8n**](n8n/) | n8n workflow source (email triage → Twenty upserts → Slack). **Writes** the CRM records the cluster observes. | n8n Cloud |
+| [**Supabase**](Supabase/) | CRM activity capture: Twenty webhook → `activity_log` → analytics views. The cluster's spine. | Supabase |
+| [**Superset**](Superset/) | Preset.io (hosted Apache Superset) BI over Supabase's aggregate-only `analytics` schema. The sole BI tool. Owns no schema. | Preset.io |
+| [**SupplierDB**](SupplierDB/) | One-off SharePoint Lists → Twenty migration (suppliers). Separate project, outside the live cluster. | (scratch → Twenty) |
+| [**Vero**](Vero/) | Vero 2.0 email-marketing layer — Vero-side source of truth (audience SQL, webhook config). **Spec stage**, owns no schema. | Vero cloud (SaaS) |
+| [**Asana**](Asana/) | Asana ↔ Twenty integration layer — auto-projects from deal stage, view-only deal mirror, edit-to-task loop. **Spec stage**, owns no schema. | Asana cloud (SaaS) |
+
+`Twenty` is the hub (schema + vendored source); n8n, Supabase, and Superset form one pipeline around it (Superset / Preset.io is the BI front-end over the aggregate-only `analytics` schema); SupplierDB is a separate one-off migration that also uploads into Twenty; Vero (spec stage) will read a row-level `marketing` surface from Supabase and write subscription state back to Twenty through a Supabase relay; Asana (spec stage) will mirror deal info into Asana and route edits back as human tasks. Full data-flow diagram and the _why_ behind each split live in [`CLAUDE.md`](CLAUDE.md).
+
+## How to work in it
+
+- **Launch Claude Code from the Repos root** (`C:\Local-Env\Repos\`) in PowerShell: `repo`. All seven trees are subdirectories of that root (since 2026-09-09).
+- Each tree's own `CLAUDE.md`/`docs/` **auto-loads on demand** when you touch its files — so you get just-in-time depth without preloading everything.
+- **Memory is unified** in one store (`~/.claude/projects/C--Local-Env-Repos/memory/`), organized into banks (`shared`, `n8n`, `supabase`, `superset`, `supplierdb`, `twenty`, `vero`, `asana`). It's pinned via `autoMemoryDirectory` so launching from _any_ tree subfolder shares the same memory.
+- **Root config** lives one level up in `C:\Local-Env\Repos\.claude\` (`settings.json`, hooks, skills, agents). It is a tree of the root repo. The root `.mcp.json` holds the Supabase MCP for the S-Drive trees; `n8n` and `context7` are global. This folder has no `.mcp.json`. There is no Stop hook. `settings.local.json` files are machine-local and gitignored everywhere.
+
+## Where to dig deeper
+
+- Outstanding work: each tree's `BACKLOG.md`, indexed at the root [`BACKLOG.md`](BACKLOG.md). Retired progress logs: per-tree `docs/archive/<sprint>/` and the root [`archive/`](archive/README.md).
+- The map, shared Twenty-CRM facts, and per-tree deep-dive links: [`CLAUDE.md`](CLAUDE.md).
+- Each tree's own `CLAUDE.md`, `docs/adr/`, and `docs/components/` hold the authoritative detail — follow the links rather than duplicating here.

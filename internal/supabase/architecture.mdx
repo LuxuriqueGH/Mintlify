@@ -1,0 +1,73 @@
+---
+title: "Architecture"
+sidebarTitle: "Architecture"
+description: "System overview of the Luxurique Supabase analytics capture layer: purpose, data flow, layers, and key design decisions."
+---
+
+## Purpose
+
+Record **the entire Twenty CRM system across the time dimension** as an immutable, append-only event ledger, so analytics have 100% insight into how records (deals, contacts, any object) change over time — not just their current state.
+
+Twenty itself only stores the _present_ state of each record, and its UI-facing `timelineActivities` feed is lossy (same-member edits to the same record within a ~10-minute window merge into one row). To answer questions like "how long do deals sit in each stage?" or "what's our win-rate per stage?", we need a clean, complete, time-stamped history. This repo is that history.
+
+## Data flow
+
+```text
+Twenty (object.created / object.updated / object.deleted webhook, all objects)
+  │  HTTP POST  { eventName, record (full after-snapshot), updatedFields, ... }
+  │  signed: X-Twenty-Webhook-Signature = HMAC-SHA256(`${timestamp}:${rawBody}`)
+  ▼
+Supabase Edge Function  `twenty-webhook`        ── verify HMAC → dedupe → insert
+  │  one row per event
+  ▼
+activity_log  (generic append-only table; typed envelope + full record as jsonb)
+  │  derive (never mutate)
+  ▼
+materialized views  (typed read models, e.g. opportunity_stage_transitions)
+  │  query
+  ▼
+analytics  (stage population, inflow, funnel, pipeline value, …)
+  │  aggregate-only, security-definer functions in the `analytics` schema
+  ▼
+Superset (Preset.io)  ── reads via the read-only `preset_ro` role (pooler, not the
+                   Data API); sees aggregates only, never raw deal rows (ADR-0011)
+```
+
+## Layers
+
+| Layer | Component | Responsibility |
+| --- | --- | --- |
+| **Ingest** | [`twenty-webhook`](components/twenty-webhook.md) edge function | Authenticate Twenty (HMAC), reject replays/dupes, write exactly one row per real event. Stateless. |
+| **Ledger** | [`activity_log`](components/activity-log.md) table | The single source of truth. Append-only, immutable, generic over object type. |
+| **Read models** | [`projections`](components/projections.md) | Stage occupancy (matview) + transitions and survival-aware dwell (views), derived from the ledger. |
+| **Backfill** | [`backfill.py`](components/backfill.md) | Snapshot every object's current state into the ledger — t=0 baseline + dropped-webhook reconciliation. |
+| **Tooling** | [`fetch-twenty-schema.py`](components/fetch-twenty-schema.md) | Pull Twenty's GraphQL schema so calls (backfill, new read models) don't guess slugs. Tooling now lives in `../../Twenty/`; see the component page. |
+| **Config** | [`config.toml`](components/config.md) | Supabase CLI config; declares the webhook function runs without JWT verification. |
+| **BI** | [`analytics` schema](components/bi-surface.md) | Aggregate-only, security-definer functions (`analytics.<name>()`) read by Superset (Preset.io) through the least-privilege `preset_ro` role. |
+
+## Key design decisions
+
+These shape everything; full rationale in [`adr/`](adr/):
+
+- [**ADR-0001**](adr/0001-capture-via-edge-function-and-postgres.md) — capture via a Supabase Edge Function + Postgres, rejecting Twenty `timelineActivities` (lossy) and an n8n passthrough (per-execution billing).
+- [**ADR-0002**](adr/0002-generic-activity-log-jsonb-envelope.md) — one generic table with a typed envelope + `jsonb` payload, so new objects/fields need zero schema change.
+- [**ADR-0003**](adr/0003-append-only-derive-via-views.md) — the log is append-only; all analytics are derived in read models (event-sourcing / CQRS).
+- [**ADR-0004**](adr/0004-idempotency-dedup-key.md) — idempotency via a stable `dedup_key` so Twenty's retries don't double-count.
+- [**ADR-0005**](adr/0005-hmac-signature-verification.md) — verify Twenty's HMAC over the raw request body.
+- [**ADR-0006**](adr/0006-system-wide-webhook-scope.md) — subscribe to _all_ objects and _all_ operations, so capture is system-wide by default.
+- [**ADR-0007**](adr/0007-historical-backfill-snapshot.md) — seed a `t=0` snapshot (and reconcile dropped webhooks) so the timeline isn't left-censored at go-live.
+- [**ADR-0008**](adr/0008-censoring-aware-read-models.md) — model stage _occupancy_ and report survival-aware (Kaplan–Meier) dwell, so right/left-censoring doesn't bias time-in-stage.
+- [**ADR-0009**](adr/0009-curated-stage-taxonomy-and-business-metrics.md) — a curated `stage_dim` (not Twenty's `position`) drives business-metric views (win rate, funnel conversion, loss analysis, aging, weighted pipeline), sliced only by the dimensions that are actually populated (deal type, brand).
+- [**ADR-0010**](adr/0010-lock-analytics-surface-to-service-role.md) — lock the analytics surface to `service_role`: every `public` view is `security_invoker` and the `anon`/`authenticated` API grants are revoked, so CRM data isn't reachable through the Data API.
+- [**ADR-0011**](adr/0011-bi-surface-via-analytics-schema.md) / [**ADR-0012**](adr/0012-analytics-surface-definer-functions-not-views.md) — serve Superset (Preset.io) from a private `analytics` schema of aggregate-only, security-definer **functions** (`analytics.<name>()`) via a read-only `preset_ro` role, so a BI credential exposes aggregates, never raw deal rows.
+
+## What "100% across time" depends on
+
+The ledger and ingest are system-wide by construction, but full historical insight has two boundary conditions, tracked in the ADRs above:
+
+1. **Capture scope = the live Twenty webhook subscription.** The receiver logs anything; it only _sees_ objects the workspace webhook emits. See ADR-0006.
+2. **The timeline starts at webhook go-live.** Records older than capture are left-censored (first stage transition has a null `from_stage`) until the [backfill](components/backfill.md) seeds a baseline; the same run reconciles webhooks Twenty dropped. See ADR-0007. Censoring that remains is surfaced, not hidden, by the dwell read model (ADR-0008).
+
+## Glossary
+
+See the domain glossary in [`../CLAUDE.md`](../CLAUDE.md) (Twenty, Deal (Twenty object; API name `opportunity`), stage, proxy inbox / email triage). Not duplicated here to avoid drift.

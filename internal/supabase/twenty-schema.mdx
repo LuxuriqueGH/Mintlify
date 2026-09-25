@@ -1,0 +1,17 @@
+---
+title: "Twenty schema dumps moved to the Twenty sibling repo"
+sidebarTitle: "Twenty Schema"
+description: "The Twenty GraphQL introspection dumps and fetcher were consolidated into the dedicated Twenty sibling repo on 2026-06-30. This page serves as a pointer."
+---
+
+The Twenty GraphQL introspection dumps and the `fetch-twenty-schema.py` fetcher were consolidated into the dedicated **Twenty** sibling repo on 2026-06-30. They are no longer duplicated here. (Supabase's own `scripts/backfill.py` and the `twenty-webhook` edge function are unaffected — they query the live API, not these dumps.)
+
+From this folder (`Supabase/schemas/twenty/`) the sibling repo is three levels up:
+
+- Schema dumps: [`../../../Twenty/schemas/twenty/`](../../../Twenty/schemas/twenty/) — `introspection.json` (`/metadata`), `data-introspection.json` (`/graphql`, use for mutation inputs), `metadata-schema.json` (normalized per-object dump)
+- Fetcher: `../../../Twenty/scripts/fetch-twenty-schema.py`
+- Vendored Twenty source: `../../../Twenty/vendor/twenty/`
+
+**Refresh** — from `C:/Local-Env/Repos/S-Drive/Twenty` in PowerShell: `python scripts/fetch-twenty-schema.py` (reads that repo's `.env` → `TWENTY_API_TOKEN`).
+
+See [`../../../Twenty/CLAUDE.md`](../../../Twenty/CLAUDE.md) for the full Twenty reference.

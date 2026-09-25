@@ -1,0 +1,17 @@
+---
+title: "qc-web: Webapp Rebuild of the Quotation and Costing Engine"
+sidebarTitle: "Introduction"
+description: "Overview of the QC Webapp rebuild project. Status, stack, and links to the spec, backlog, and agent orientation."
+---
+
+# qc-web
+
+Webapp rebuild of the Luxurique Quotation and Costing Engine (QC Sheet), replacing the Excel VBA workbook in `../QuotationCostingEngine`.
+
+**Status: spec stage — nothing built yet.**
+
+- [SPEC.md](SPEC.md) — architecture, decisions, phased plan
+- [BACKLOG.md](BACKLOG.md) — work items by phase
+- [CLAUDE.md](CLAUDE.md) — agent orientation + cross-repo pathways
+
+Stack (agreed 2026-08-17): static React SPA (Vite + TypeScript + TanStack + Tailwind) on Cloudflare Pages + one Supabase project (Postgres/RLS, M365 SSO, Storage, Realtime). No self-operated servers.

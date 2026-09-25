@@ -1,0 +1,74 @@
+---
+title: "Wiring Preset.io to Supabase (read-only)"
+sidebarTitle: "Connection"
+description: "Connect Preset.io to the Supabase database as the least-privilege preset_ro role, reading only the analytics.* aggregate functions."
+---
+
+# Wiring Preset.io → Supabase (read-only)
+
+Connect **Preset.io** (hosted Apache Superset) to the Supabase database as the least-privilege **`preset_ro`** role, reading only the `analytics.*` aggregate functions (`analytics.<name>()` — security-definer; see `../Supabase` ADR-0011/0012).
+
+## Prerequisites (done once, in the Supabase repo)
+
+1. **Apply the `preset_ro` migration.** From `C:/Local-Env/Repos/S-Drive/Supabase` in PowerShell:
+   ```powershell
+   npx supabase db push     # or paste the file into the Supabase SQL editor
+   ```
+   File: `supabase/migrations/20260625104500_preset_analytics_role.sql`. It creates the `preset_ro` login role and grants it `USAGE` on `analytics` + `EXECUTE` on the aggregate functions — nothing on any base table.
+2. **Set the role's password.** The migration ships none (secrets never live in git; the role fails closed until you do this). In the **Supabase SQL editor**, run:
+   ```sql
+   alter role preset_ro with password '<generate a strong random password>';
+   ```
+   Store it in your secret manager — it is the only credential Preset.io holds, and it can read aggregates only.
+3. **Confirm the wall holds** (Supabase SQL editor):
+   ```sql
+   set role preset_ro;
+     select * from analytics.opportunity_rollup();  -- ✅ returns aggregate rows
+     select * from public.activity_log limit 1;     -- ❌ permission denied (correct)
+   reset role;
+   ```
+
+## Add the database in Preset.io
+
+> **This connection is set up once, manually (below), and managed in the GUI only** (password rotation included — since the API was gated, no script touches it). After it exists, the analytics **datasets** are provisioned on top of it via the GUI import bundle built by `scripts/setup_preset.py` — the bundle references this connection by uuid and never carries its password. See `README.md` → _Provisioning_.
+
+In Preset, open **Settings → Database Connections → + DATABASE → PostgreSQL** (psycopg2 is bundled; no driver install). Pull the exact host/region from the Supabase dashboard: **Project Settings → Database → Connection pooling → Transaction pooler**. Then fill in the `preset_ro` credentials:
+
+| Field | Value |
+| --- | --- |
+| Host | `aws-1-ap-southeast-1.pooler.supabase.com` _(copy from the dashboard)_ |
+| Port | `6543` _(**Transaction** pooler — chosen deliberately, see below)_ |
+| Database name | `postgres` |
+| Username | `preset_ro.hfsmqsndxrszwppnwads` _(Supavisor wants `role.project-ref`)_ |
+| Password | the password you set above |
+| SSL | **Required** (`sslmode=require`) |
+
+Or paste the equivalent **SQLAlchemy URI** in the "Connect this database with a SQLAlchemy URI" box (URL-encode any special characters in the password):
+
+```text
+postgresql://preset_ro.hfsmqsndxrszwppnwads:<password>@aws-1-ap-southeast-1.pooler.supabase.com:6543/postgres?sslmode=require
+```
+
+> The username really is `preset_ro.hfsmqsndxrszwppnwads` on the pooler (role + project-ref), **not** bare `preset_ro`. The project-ref is the same one in your `db.hfsmqsndxrszwppnwads.supabase.co` host. A direct (non-pooler) connection uses bare `preset_ro`, but the pooler is the supported path for external tools.
+
+**Why transaction pooler (6543), not session (5432).** The session pooler hit connection limits when a full dashboard's worth of charts loaded at once (each open chart query held a session-pooler slot); the transaction pooler's per-statement multiplexing absorbs that burst instead. Safe here because every dataset calls a fully-qualified `analytics.<fn>()`, the functions are `SECURITY DEFINER` and pin their own `search_path`, and nothing in this repo relies on session state or prepared statements — the two things transaction mode can't support. This is a deliberate, ratified choice, not a workaround.
+
+Click **TEST CONNECTION**, then **CONNECT**.
+
+## Incident (2026-07-14 → 2026-07-29)
+
+A 2026-07-14 GUI reconnection (moving the connection onto the transaction pooler) silently swapped the live role from `preset_ro` to the Supabase project owner (`postgres.hfsmqsndxrszwppnwads`): the Supabase dashboard's Connect helper only pre-fills the default `postgres` credential, and it came along for the ride when the connection was rebuilt. The regression sat undetected until the 2026-07-29 final branch review (`daygrain`, finding C1) caught it via the tracked connection snapshot. Fixed by repointing to `preset_ro.hfsmqsndxrszwppnwads` on the same (transaction) pooler — the URI above is the corrected value. `scripts/export_preset.py` now hard-fails any ingest whose connection username isn't `preset_ro.*`, so the next GUI export mechanically verifies the repoint. Password rotation was waived: the `postgres` password never entered git (exports mask it, not the username) and lived only inside Preset's connection config. Backlog record: `superset-091` (C1) in `docs/BACKLOG-ARCHIVE.md`.
+
+## Make Preset see only the aggregates
+
+- **In the connection's _Advanced → SQL Lab_ options**, leave it as a query source if you want SQL Lab, but note `preset_ro` can only reach `analytics` — every other schema returns permission-denied, so there is nothing sensitive to expose.
+- When building datasets, pick **schema `analytics`** and the function results. (In Superset a set-returning function is queried as `select * from analytics.opportunity_rollup()` via SQL Lab → "Save dataset", since the table picker lists tables/views, not functions.)
+
+## Notes / hardening
+
+- **Read-only by construction.** `preset_ro` has no write grants and no base-table grants; it can only `EXECUTE` the aggregate functions. No reliance on any client-side read-only toggle.
+- **Network allow-listing.** If Supabase **Network Restrictions** are enabled, add Preset.io's static egress IPs (shown on the Preset connection screen / Preset docs) to the allow-list. Note the pooler may not honor IP restrictions on all Supabase plans — verify.
+- **Query guards** are set at the role level (`statement_timeout = 120s`, `idle_in_transaction_session_timeout = 60s`) — a runaway chart query can't pin a connection.
+- **Connection limit** (since 2026-09-25, `supabase-051`, `../Supabase` ADR-0011 addendum): `preset_ro` has CONNECTION LIMIT 20. The Supavisor Pool Size is 15, and the limit keeps 5 more for a new connection after a drop. Increase the limit if the Pool Size goes above 15. The limit must not be less than the Pool Size.
+- **Freshness:** the analytics functions read `activity_log` / `opportunity_current` **live** (no matview), so they reflect captured webhooks immediately (`../Supabase` `docs/components/bi-surface.md`).
+- **Revoking access:** revoke cleanly with `drop role preset_ro;` in the Supabase SQL editor (after removing the connection in Preset).

@@ -1,0 +1,52 @@
+---
+title: "marketing-surface"
+sidebarTitle: "Marketing Surface"
+description: "Row-level marketing read surface for RudderStack Reverse ETL. Includes person_current, marketing.synced() DEFINER function, the rudder RETL role, and the vero_ro legacy role."
+---
+
+**Files:** `supabase/migrations/20260814120000_vero_marketing_read_surface.sql`, `supabase/migrations/20260819120000_marketing_subscribers_field_gate.sql`, `supabase/migrations/20260825120000_marketing_synced_surface.sql`, `supabase/migrations/20260825130000_rudder_retl_role.sql` **Consumer:** RudderStack Reverse ETL as the `rudder` login (since 2026-08-25) → the email tier. Vero's direct `vero_ro` read is superseded. **Decision records:** [ADR-0037](../adr/0037-vero-marketing-read-surface.md), [ADR-0039](../adr/0039-marketing-synced-surface.md)
+
+The cluster's first deliberately **row-level** external surface: what the marketing tier reads to build campaign audiences. Read path only; the write-back path (webhook ingest, processor, Twenty marketing fields) is not built yet.
+
+## Objects
+
+| Object | What |
+| --- | --- |
+| `public.person_current` | Latest state per person (1 row/person) from `activity_log` — the `opportunity_current` pattern. Excludes soft-deleted (`deletedAt`) and `deleted`/`destroyed` actions. Typed columns (`person_id`, `first_name`, `last_name`, `email` lowercased, timestamps, `marketing_email_status`) + full after-record jsonb. `security_invoker = on`, service-role only. |
+| `marketing` schema | Row-level BY DESIGN — a different schema with a different role; the `analytics` aggregate-only rule is untouched. Never in `config.toml` exposed schemas. |
+| `marketing.synced()` | SECURITY DEFINER function (definer _functions_ read through the invoker views; definer views can't — ADR-0012). Returns `person_id, email, first_name, last_name, honorific, person_type, marketing_email_status`. **Membership = Twenty `person.marketingEmailStatus IS NOT NULL`.** Renamed from `marketing.subscribers()` 2026-08-25 (ADR-0039). |
+| `rudder` | Login for the RudderStack RETL source (migration `20260825130000` — created ad-hoc 2026-08-25, recorded + hardened there). `USAGE` on `marketing` + `EXECUTE` on `marketing.synced()`, plus `USAGE, CREATE` on the `_rudderstack` state-tracking schema RETL requires. `CONNECTION LIMIT 10`, `statement_timeout 120s`, `idle_in_transaction 60s`. Nothing else. |
+| `_rudderstack` schema | RudderStack's sync state — snapshot/unload/failed_keys staging tables plus `sync_log`, created and dropped by the sync itself. Never in `config.toml` exposed schemas. |
+| `vero_ro` | Legacy dedicated read-only login for Vero's direct SQL data source. `CONNECTION LIMIT 4`, `statement_timeout 60s`, `idle_in_transaction 30s`. Still granted `EXECUTE` on `marketing.synced()` so the rename didn't silently break it; drop the role and that grant together when the direct-SQL path is formally decommissioned. |
+
+## Contract
+
+- RudderStack connects over the **Supavisor session pooler** (port 5432, user `rudder.<project-ref>`) as a **Model** source, not a Table source — the `marketing` schema contains no tables, so the Table picker is empty. Model SQL: `select * from marketing.synced()`.
+- **Sync mode is Upsert**, keyed on `person_id` — `identify` into Vero every 5 minutes, from the **prod** RudderStack workspace (`luxurique-sasha.s`; the dev-workspace prototype was torn down 2026-08-25). Build runbook: `../../../Vero/docs/rudderstack-retl.md`.
+- **Who is in the surface is a Twenty-side decision** — set `Marketing Email
+  Status` on the person record. No SQL, no deploy.
+- **Membership ≠ consent.** The surface deliberately carries unsubscribed and bounced people so their state can travel (see below). Anything reading it must filter on `marketing_email_status` itself.
+- **Widening the _column list_ is a migration + ADR here**, never a destination-side change (the Superset rule, applied to the marketing tier).
+- Every new `marketing.*` function: revoke `PUBLIC EXECUTE` (default privileges cover functions created by `postgres`; stay alert for other creators).
+
+## Why membership is `IS NOT NULL`, not `= 'SUBSCRIBED'`
+
+RudderStack RETL upsert propagates INSERTs and UPDATEs, **never DELETEs**. Full sync mode doesn't either — it re-sends every row but never removes one. Mirror mode is the only mode that deletes, and it's restricted to a short destination list that doesn't include ours.
+
+Under the old `= 'SUBSCRIBED'` gate, an unsubscribe **removed the row** — exactly the signal RETL cannot carry. The unsubscribe would land in Twenty, land in `activity_log`, correctly drop out of the function, and the destination would never hear about it. Silent, and wrong in the compliance-critical direction.
+
+With `IS NOT NULL`, an unsubscribe is an **update of a returned column**, which upsert propagates. NULL (never touched) still stays out, so the surface is still opt-in.
+
+## The gate field
+
+`person.marketingEmailStatus` — Twenty SELECT, created 2026-08-19 (field id `19ee9576-456c-430d-a96e-dcdcb5cdc898`), nullable, **no default**. Options: `SUBSCRIBED | UNSUBSCRIBED | BOUNCED | COMPLAINED`.
+
+Machine-owned once the write-back step lands (the processor writes UNSUBSCRIBED/BOUNCED/COMPLAINED back from reporting webhooks). Until then it is hand-set in the Twenty UI.
+
+## Gotchas
+
+- **Never clear the field back to NULL.** Set `UNSUBSCRIBED` instead. A non-null → NULL transition vanishes the row from the surface, and that deletion still cannot be propagated — the one residual drift gap ADR-0039 accepts. NULL means "never touched".
+- **A newly created Twenty field is not retroactive in capture.** The `record` jsonb only carries `marketingEmailStatus` for people captured _after_ the field existed. Setting the value bumps `updatedAt` → fires `person.updated` → the key lands. So "set their status in Twenty" is also what makes them visible here. (Precedent: `standing` is present on 530 of 638 person rows for the same reason.)
+- **`person_type` is flattened.** Twenty's `typeCustom` is a MULTI_SELECT stored as a jsonb array (`["AGENT","CLIENT"]`); the function emits it comma-joined because RETL trait mapping handles scalars predictably and arrays do not. Segment with a _contains_ match, not equality.
+- `person_current` scans `activity_log` person rows live. Fine at current volume; materialize (the old projections lever) only if the audience query drags.
+- The destination's own suppression list is authoritative at send time. Since the surface now carries unsubscribed people, that list is load-bearing, not belt- and-braces.

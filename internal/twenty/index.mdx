@@ -1,0 +1,41 @@
+---
+title: "Twenty: CRM Schema Reference and Artifacts"
+sidebarTitle: "Introduction"
+description: "The dedicated location for Twenty CRM in the Luxurique S-Drive workspace. Holds schema reference, fetcher, read-only source copy, and documents."
+---
+
+# Twenty
+
+The dedicated location for **Twenty CRM** in the Luxurique S-Drive workspace. This repo holds the schema reference, the schema fetcher, the read-only Twenty source copy, and the Twenty documents. The other repos (n8n, Supabase, SupplierDB) read Twenty or write to Twenty. This repo holds the artifacts that these repos duplicated before.
+
+Twenty is **cloud SaaS software**. You deploy no code from here.
+
+## Layout
+
+```text
+schemas/twenty/      Canonical Twenty GraphQL introspection dumps (committed)
+  introspection.json        /metadata schema (object/field management)
+  data-introspection.json   /graphql schema (record data — use for mutation inputs)
+  metadata-schema.json      normalized per-object/field dump
+  README.md                 navigation guide
+scripts/
+  fetch-twenty-schema.py    refreshes the three dumps from the live workspace
+vendor/twenty/       Read-only standalone checkout of the Twenty monorepo (gitignored, ~456 MB)
+docs/adr/            Decisions about the Twenty workspace / this repo
+```
+
+## Refresh the schema
+
+From `C:/Local-Env/Repos/S-Drive/Twenty` in PowerShell:
+
+```text
+python scripts/fetch-twenty-schema.py
+```
+
+`TWENTY_API_TOKEN` in a local `.env` is necessary (read `.env.example`). Commit the new dumps. Then the other repos read the same data.
+
+## Consumed by siblings via relative paths
+
+`../Twenty/schemas/twenty/*.json`, `../Twenty/scripts/fetch-twenty-schema.py`, `../Twenty/vendor/twenty/`. No code reads the dumps at build time or at runtime. They are reference artifacts that you read. See [`CLAUDE.md`](CLAUDE.md) for the full Twenty reference.
+
+**Last modified:** 2026-09-18 UTC. The ste100 toolkit rewrote the prose of this file in ASD-STE100 Issue 9 (Simplified Technical English). Headings, code, links, tables, numbers, names, and ADR decisions are unchanged. Cause: the documentation rewrite run `2026-09-08-all-repos` for every repo in the workspace. Actors: opus rewrite agent, opus review agent (0 meaning drifts fixed), then `tools/land.py` committed the file and wrote this stamp.

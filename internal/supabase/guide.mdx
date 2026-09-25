@@ -1,0 +1,147 @@
+---
+title: "Guide: turn on the activity log (gentle, step by step)"
+sidebarTitle: "Guide"
+description: "A step-by-step walkthrough for setting up the Luxurique Supabase activity log with no prior Supabase experience. Covers project creation, linking, deployment, and webhook registration."
+---
+
+This walks you through everything, in order, assuming no prior Supabase experience. Each step says **what you're doing** and **why**. Copy-paste the commands as-is, only replacing the `<...>` placeholders.
+
+Total time: ~30 minutes. You do this once. Run commands from this repo folder (`C:\\Local-Env\\Repos\\S-Drive\\Supabase`) in PowerShell.
+
+---
+
+## What you're setting up (the 10-second version)
+
+Every time something changes in Twenty (a deal moves stage, a contact is added), Twenty quietly sends a message to a little program you'll host on Supabase. That program writes one row into a database table. Later, you run simple queries on that table to answer "how long do deals sit in each stage?", "what's our win rate?", etc.
+
+Three things: **(A)** make the database table, **(B)** put the little program online, **(C)** tell Twenty where to send its messages.
+
+---
+
+## Before you start
+
+- [ ] A **Supabase account** (free) → [https://supabase.com](https://supabase.com)
+- [ ] **Admin access to your Twenty workspace** (to add a webhook).
+- [ ] **Node.js** (already installed — we use `npx`, which comes with it).
+
+---
+
+## Part A — Make the database table
+
+### Step 1. Create a Supabase project
+
+1. [https://supabase.com/dashboard](https://supabase.com/dashboard) → **New project**.
+2. Name it (e.g. `luxurique-analytics`), pick a nearby region, set a database password (save it in your password manager).
+3. Wait ~2 minutes for setup to finish.
+
+### Step 2. Find your project reference id
+
+Dashboard → **Project Settings → General → Reference ID** (looks like `abcd1234efgh`). You'll use it a few times below.
+
+### Step 3. Link this repo to your project
+
+```powershell
+npx supabase login        # opens browser, approve
+npx supabase link --project-ref <your-reference-id>
+```
+
+> **Why:** Lets your computer talk to your Supabase project.
+
+### Step 4. Create the tables
+
+```powershell
+npx supabase db push
+```
+
+This runs every migration in `supabase/migrations/` (~45 timestamped files, applied in order) against your database.
+
+> **Prefer clicking?** Alternative: open each file under [supabase/migrations/](supabase/migrations/), copy its contents into the dashboard **SQL Editor**, and **Run** — in timestamp order. With ~45 files, `db push` is strongly preferred.
+
+✅ Check: dashboard → **Table Editor** → you should see an empty `activity_log` table.
+
+---
+
+## Part B — Put the little program online
+
+### Step 5. Generate a secret
+
+A shared password between Twenty and your program, so nobody can send fake messages. Generate a random one:
+
+```powershell
+-join ((48..57) + (65..90) + (97..122) | Get-Random -Count 40 | ForEach-Object { [char]$_ })
+```
+
+Copy the printed string and **save it** — you'll paste it twice.
+
+### Step 6. Deploy the program
+
+```powershell
+npx supabase functions deploy twenty-webhook
+```
+
+> **Why:** Uploads the code in [supabase/functions/twenty-webhook/index.ts](supabase/functions/twenty-webhook/index.ts) and makes it reachable at a public URL. (It skips Supabase login checks because Twenty proves itself with the secret instead — already set in `config.toml`.)
+
+Your function URL is: `https://<your-reference-id>.functions.supabase.co/twenty-webhook`
+
+### Step 7. Give the program the secret
+
+```powershell
+npx supabase secrets set TWENTY_WEBHOOK_SECRET=<the-secret-from-step-5>
+```
+
+---
+
+## Part C — Tell Twenty where to send changes
+
+### Step 8. Add the webhook in Twenty
+
+1. Twenty → **Settings → APIs & Webhooks → Webhooks → Create webhook**.
+2. **URL**: the function URL from Step 6.
+3. **Secret**: the same secret from Step 5.
+4. **Events**: subscribe to all objects, all operations — `*.created`, `*.updated`, `*.deleted`.
+5. Save.
+
+---
+
+## Part D — Check it works
+
+### Step 9. Make a change and look for it
+
+1. In Twenty, open any **Deal** (Twenty object; API name `opportunity`) and change its **Stage**.
+2. In Supabase **SQL Editor**:
+   ```sql
+   select object, action, record_id, happens_at, updated_fields
+   from activity_log order by id desc limit 5;
+   ```
+   A row with `object = opportunity`, `action = updated` → 🎉 done.
+
+### Step 10. See your first analytics
+
+```sql
+-- Pipeline state straight from the log-derived view (no refresh step - views read activity_log live):
+select stage, count(*) as deals
+from opportunity_current
+group by stage
+order by deals desc;
+```
+
+(Needs a few real stage changes over time before it's meaningful — data builds up as Twenty gets used.) There's no refresh step to run: `opportunity_current` and the rest of the analytics surface derive straight from `activity_log` on every query.
+
+---
+
+## If something doesn't work
+
+- **No row after Step 9** → Supabase → **Edge Functions → twenty-webhook → Logs**.
+  - `invalid signature` → the Twenty secret (Step 8) ≠ the one you set (Step 7). Redo Step 7 with the exact same value, or recreate the webhook in Twenty.
+  - Nothing in the logs → wrong URL or events not subscribed. Re-check Step 8.
+- **`npx supabase` asks to install something** → say yes (first-use CLI fetch).
+- **Win-rate query shows odd stages** → the won-line is curated in `stage_dim.is_won` (CONTRACTED+, ADR-0009); edit that one column, not a migration placeholder. Since ADR-0034 (2026-07-31) that is the **only** won lever — every analytics surface, win-rate included, reads its won line from that column.
+
+---
+
+## Ignore for now
+
+- Twenty retries a failed send a few times then gives up — the scheduled `reconcile` edge function (pg_cron, every 10 min — ADR-0023) recovers anything lost; `scripts/backfill.py` seeds the t=0 baseline. So it's fine.
+- Changes made by the API/n8n (not a person) won't have a "who" attached. Normal.
+
+Stuck? Tell me the step number and the error.

@@ -1,0 +1,57 @@
+---
+title: "Component: backfill (snapshot + reconciliation)"
+sidebarTitle: "Backfill"
+description: "Standalone script that reads the current state of every business object from Twenty's GraphQL API and upserts snapshot rows into activity_log for t=0 seeding and reconciliation."
+---
+
+**File:** [`scripts/backfill.py`](../../scripts/backfill.py) **Related:** [ADR-0007](../adr/0007-historical-backfill-snapshot.md), [ADR-0004](../adr/0004-idempotency-dedup-key.md)
+
+## What it is
+
+A standalone script that reads the **current state of every business object** from Twenty's runtime GraphQL API (`/graphql`) and upserts one `action = 'snapshot'` row per record into [`activity_log`](activity-log.md). One operation, two jobs:
+
+- **t=0 seed** (first run) — gives pre-existing records a baseline so read models have a defined entry state; fixes left-censoring (ADR-0007).
+- **Reconciliation** (recurring) — recovers changes whose webhook Twenty dropped (it retries 4× then drops, no dead-letter, no replay API).
+
+## How it works
+
+1. Introspect the runtime schema once; list objects from `/metadata` (active, business objects by default — `--include-system` to include Twenty's internals).
+2. Per object, build a node selection from introspection — all scalar/enum fields, composites expanded one level, to-one relations as `{ id }`, to-many skipped. Survives custom fields (no hardcoded slugs).
+3. Paginate records (`first`/`after`), map each to a snapshot row, batch-upsert to PostgREST `/rest/v1/activity_log?on_conflict=dedup_key` with `Prefer: resolution=ignore-duplicates` using the **service-role** key.
+
+## Idempotency (why re-running is safe)
+
+`dedup_key = sha256('snapshot|<object>|<id>|<updatedAt>')`.
+
+- Unchanged record → same key → ignored.
+- `updatedAt` advanced (a missed webhook) → new key → inserted (recovered).
+- The literal `snapshot` prefix can never collide with a webhook key (those are `'<object>.<action>|…'`); see [ADR-0004](../adr/0004-idempotency-dedup-key.md).
+
+`happens_at` is set to the record's `updatedAt` (its real change time), so seeds of pre-existing records order _before_ live webhooks and recovered updates land at the right point for `LAG()`/occupancy reconstruction.
+
+**Limitation:** a snapshot is current state only. If more than one update was missed between runs, only the latest is recovered — inherent to snapshot CDC.
+
+## Usage
+
+```sh
+pip install requests python-dotenv truststore
+python scripts/backfill.py --dry-run                 # introspect + count, no writes
+python scripts/backfill.py                           # seed/reconcile all objects
+python scripts/backfill.py --object opportunity       # one object (repeatable)
+```
+
+Flags: `--dry-run`, `--object <nameSingular>` (repeatable), `--include-system`. No refresh step — the analytics surface derives from `activity_log` live, so there's nothing to recompute after a write.
+
+## Environment
+
+- `TWENTY_API_TOKEN` — workspace API key (also used by `fetch-twenty-schema.py`).
+- `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY` — write path; **service-role**, server-side only, never committed. Not needed for `--dry-run`. See `.env.example`. Both key types work: a legacy `service_role` JWT (sent on `apikey` + `Authorization`) or a new `sb_secret_…` key (sent on `apikey` only — it's not a JWT).
+
+## Scheduling
+
+Run this **once** for the t=0 seed (and ad-hoc for deep audits / a full re-sweep). **Recurring** dropped-webhook reconciliation is no longer this script's job — it was moved in-database to the pg_cron-scheduled [`reconcile`](reconcile.md) edge function, which does an incremental `updatedAt` delta every 10 min instead of a full sweep (ADR-0023). This script stays the full-sweep tool; `reconcile` is the forward-only recurring backstop.
+
+## Gotchas
+
+- The runtime API uses **flat** Relay args (`first`/`after`/`filter`/`orderBy`), unlike `/metadata`'s `paging:{}` wrapper.
+- `record_id` must be a uuid; records without `id` or `updatedAt` are skipped (and counted) rather than written.

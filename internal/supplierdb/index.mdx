@@ -1,0 +1,23 @@
+---
+title: "SupplierDB: SharePoint Supplier Migration into Twenty"
+sidebarTitle: "Introduction"
+description: "Internal engineering wiki for SupplierDB, the system that migrates messy SharePoint supplier lists into Twenty CRM. Domain language, dedup rules, and schema references."
+---
+
+SupplierDB is the domain system for migrating messy SharePoint supplier lists into Twenty CRM. Source rows jumble three entity types together (Companies, People, and Resources). SupplierDB defines what each one is so the untangling stays honest to reality.
+
+Stage one migrates People and Companies cleanly. Resources are deferred to a later stage. The system includes a deduplication pipeline, Twenty upload mapping, and schema reference artifacts.
+
+<CardGroup cols={2}>
+  <Card title="Context" icon="book" href="/internal/supplierdb/context">
+    Domain language, relationships, and stage-one approach
+  </Card>
+
+  <Card title="Dedup Design" icon="shuffle" href="/internal/supplierdb/dedup-design">
+    Conservative auto-merge tiers and profiling counts
+  </Card>
+
+  <Card title="Twenty Schema" icon="code" href="/internal/supplierdb/twenty-schema">
+    Schema introspection dumps and fetcher reference
+  </Card>
+</CardGroup>

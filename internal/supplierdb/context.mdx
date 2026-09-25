@@ -1,0 +1,95 @@
+---
+title: "SupplierDB Context: Domain Language for Supplier Migration"
+sidebarTitle: "Context"
+description: "Domain language and rules for migrating messy SharePoint supplier lists into Twenty CRM. Defines Suppliers, Companies, Persons, Resources, and stage-one approach."
+---
+
+# SupplierDB
+
+Domain language for migrating messy SharePoint supplier lists into Twenty. Source rows jumble three entity types together; this context fixes what each one _is_ so the untangling stays honest to reality.
+
+**Scope — stage one:** migrate **People + Companies** cleanly. **Resources are deferred** to a later stage. Hard constraint: preserve the **linkage** from each source row's resource-facts to the Person/Company it belongs to, so Resources can be built later without re-deriving it. Resource object _storage/shape_ is explicitly out of scope now.
+
+## Language
+
+**Supplier**: The party that provides an offering. Is _either_ a **Company** or a **Person** — never both, never invented. If the real-world supplier is a lone individual, the Supplier is a **Person**; we do **not** mint a placeholder Company for them. _Avoid_: vendor, provider, account
+
+**Company**: A supplier that is a real organization (hotel, restaurant, bus operator, activity firm…). Maps to Twenty standard `company`. _Avoid_: org, business, account
+
+**Person**: A human — either a contact at a Company, or an individual who is themselves the Supplier (e.g. an interpreter). Maps to Twenty standard `person`. _Avoid_: contact, user
+
+**Resource**: A sellable offering supplied by exactly one Supplier (a room/hotel, an activity, a vehicle, a guiding service…). The new Twenty custom object this migration designs. _Avoid_: offering (informal alias), product, listing, item
+
+**Category**: The supplier-list shard an offering came from (Accommodation, Activities, Artisans, Event Services, Guest Services, Interpreters/Guides, Organizations, Restaurants, Transportation bus, Transportation car, Venues). Candidate Resource SELECT field.
+
+**Property vs Chain**: A **Property** is an individual supplier location/entity (e.g. _JW Marriott Hotel Nara_). A **Chain** is the brand/parent whose website many Properties share (`marriott.com`). Dedup identity is the **Property name**, never the shared **Chain domain** — distinct Properties under one Chain must stay distinct. See [docs/dedup-design.md](docs/dedup-design.md). _Avoid_: brand (ambiguous between the two)
+
+## Relationships
+
+- A **Resource** is supplied by exactly one **Supplier** = one **Company** XOR one **Person**. Modeled as two _optional_ FK fields on Resource (`companyId`, `personId`); exactly one set, XOR enforced in staging (Twenty has no schema-level XOR).
+- A **Company** supplies one or more **Resources** (1:N — e.g. an activity firm with many activities; 1:1 for Accommodation/Restaurants/Venues where the org _is_ the offering).
+- A **Person** is either a contact of a **Company** or the **Supplier** of a **Resource**.
+
+## Stage-one approach (resolved)
+
+- Output = two **aggregated** (not deduped) tables under `data/staged/`: one row per Company, one row per Person (multi-contact cells **exploded** to one row each).
+- **Minimal transform only**: separate Company-facts from Person-facts per category; explode multi-person cells. Source fields carried **verbatim**.
+- **Deferred** (same problem as dedup / resource stage): name parsing (honorific, JP order), address/phone/currency normalization, JSON-array flattening.
+- **Linkage** preserved via provenance on every record: `source_file` + `source_row_id`, plus `company_ref` on each Person. A future Resource = its source row → already carries those keys. Dedup runs later _on_ the aggregate.
+
+## Flagged ambiguities
+
+- "Supplier" was assumed to always be a Company — resolved: it is Company XOR Person; never invent a Company for an individual supplier.
+- **Artisans**: Company = the craft **center** (`Art / Craft Centers`, fallback `Coordination Center`). Resolved by fill-rate: `Artisan Name` 3/234 and `Contact Email` 2/234 are dead; the center (233/234) carries the org identity. Individual artisan is not in the data.
+
+## Person role (resolved)
+
+Each extracted Person carries a `role`: `supplier` (the individual _is_ the Supplier — Interpreters/Guides, and any future person-supplier; `company_ref` null) or `contact` (a contact pulled from a Company row; `company_ref` set). Captured at extraction so later Resource→Supplier linkage is unambiguous.
+
+## Multi-contact explosion (all company categories — resolved)
+
+Multi-person cells are NOT exclusive to Organizations (audit disproved the earlier "Organizations only" assumption — Accommodation packs ~15 numbered-list rows, etc.). Explosion is driven by the **contact-NAME field's multiplicity**, split on **deterministic** separators: newline / `;`, numbered lists (`1. … 2. …`), and **spaced `/`** (glued `Yazaki/Ms.` honorific stays intact). When >1 person, the parallel email/phone/title lists are split the same way and positionally zipped; shorter lists → blank (never recycle). Single-person rows keep email/phone/title whole (so multi-_phone_ cells don't falsely trigger explosion). Fields are verbatim; parsing deferred.
+
+`needs_review` is set when: person-count ≠ a non-empty parallel list's count (misaligned explosion), the NAME contains a **fuzzy** separator we don't auto-split (`・`、`&`,`and`), or a contact has no Company (`company_ref` empty). Raw cells always preserved in `source_raw`.
+
+## Per-category mapping fixes (resolved after specialist audit)
+
+- **Transportation (bus)**: `Title` is the EN company name (→ `name`), `Bus Company` is JA (→ `name_ja`). Were swapped.
+- **Artisans**: `Contact Number` is SharePoint item IDs (all-digit, no formatting), **not** a phone — unmapped. Artisans has no real phone data.
+- **Activities**: `Supplier Type == "An Individual"` (3 rows) routes the supplier to a **Person** (`role=supplier`, no company) per the never-invent-a-Company rule. `"A Company"` rows unchanged.
+- **Restaurants / Venues / Transportation (bus)**: `Landline` / `Contact number` / `Phone number` are the org's phone → `company.phone` (were dropped to `source_raw` only).
+
+## Phone / email / fragment routing (resolved 2026-06-15)
+
+Facts are routed to the right entity **by content, not by which source column they sat in** — done at extraction in `build.py` (`parse_persons_cell` + the routing in `extract`).
+
+- **Phones by type.** A number whose JP national form starts **070 / 080 / 090** is a **mobile → Person**; everything else (landline, international) → **Company** (`is_mobile`). Each phone token is classified individually; landlines pulled off contacts become the company's primary/additional phone. Exception: a **company-less** Person (freelancer / orphan contact) keeps its landline — there is no company to hold it.
+- **Role mailboxes → Company.** Generic inboxes (`info@`, `hello@`, `support@`, `travel@`, `sales@`, `reservations@`, `contact@`, …) are company addresses, not people — routed to `company.emails` (`is_role_mailbox`, the curated `ROLE` set; **not** the dotless-local test, which misfires on real surnames like `saitoh@`). Only when no company exists does a role email stay on the Person (flagged).
+- **No fragment people.** A "contact" cell that is really company facts is consolidated into a richer Company and **no Person is minted**. Three shapes handled: (1) a **legal name** with no person signal (`バリューマネージメント株式会社`, `Shima Marine … Co., Ltd.`) — kept iff an honorific / `<NAME>` tag / parenthetical name is present (`is_company_fragment`); (2) a **vCard block** crammed into one cell (`株式会社…\nインバウンド部\n中本 恭司 <NAKAMOTO,kyoji>\n〒…\nphone:…\ne-mail:…\nhttps://…`) — peeled into one Person + company facts instead of being newline-split into ~9 fragments (`parse_persons_cell`); (3) **dept labels** (`Operations & Reservations`, `インバウンド部`, `Reservation Center`) dropped (`is_dept_noise` — explicit dept terms only; a bare `部`/`課` suffix is a common surname). A person shell left with no name + no email + no phone is dropped (`_has_identity`).
+- **Number 13 Taxi (root cause).** The email was lost because the dept line `Operations & Reservations` forced the multi-person path, and the email cell was then split by the numbered-list regex, which matched the **`13.` inside `taxi13.jp`** (`contact@taxi` + `jp`). Fixed by (a) routing the role email `contact@` to the company, (b) peeling the dept label, and (c) parsing per-person emails with `EMAIL_RX` instead of the list-splitter.
+
+## Twenty upload mapping (resolved against live schema 2026-06-09)
+
+Workspace was shaped for this migration; staged fields have homes. Keys are exact enum values.
+
+**Person** — `name`→`name` (FullName, parse later), `name_ja`→`nameJp`, `email`→`emails`, `phone`→`phones`, `title`→`jobTitle`, honorific→`honorific` (MR/MRS/MS/SIR/DR; JP `様`/`さん` have no value → leave unset).
+
+- `typeCustom`: `role=supplier` (no company) → **`SUPPLIER_FREELANCE`**; `role=contact` → **`SUPPLIER_COMPANY`**.
+- `industry` (`PersonIndustryEnum`): from the person's category (freelancer = their source-file category; contact = their company's category).
+- **company links** — two 1:N relations (Twenty has no M2M, [ADR-0003](docs/adr/0003-person-company-two-one-to-many-relations.md)): `companyId` = single employer; `pocId` per company = the one point of contact. Exactly-one-company person → `companyId` = that company. Multi-company contact (one person across 43 Tokyu properties) → `companyId` = the **holding** linking them (dominant holding among refs; blank + `needs_review` only if their companies share no holding); their per-property links stay on each company's `pocId`. (Revised 2026-06-17 — previously `companyId` was left blank for multi-company people.)
+
+**Company** — `name`→`name`, `name_ja`→`nameJp` (single field now; `nameJap` removed), `website`→`domainName`, `phone`→`phone`, `address`→`address` composite, `prefecture`→`address.addressState`, `city`→`address.addressCity`. `typeCustom`=`SUPPLIER` (all).
+
+- `industry` (`CompanyIndustryEnum`): Accommodation→`ACCOMMODATION`, Activities→`ACTIVITIES`, Artisans→`ARTISANS`, Event Services→`EVENT_SERVICES`, Guest Services→`GUEST_SERVICES`, Interpreters/Guides→`GUIDES_INTERPRETERS`, Restaurants→`RESTAURANTS`, Transportation (bus|car)→`TRANSPORTATION`, Venues→`VENUES`. **Organizations** → per its own `Category` column: Tourism Association→`ASSOCIATION`, DMO→`DMC_DMO`, Consultant→`CONSULTING`.
+
+**Chains → Holding Companies** ([ADR-0004](docs/adr/0004-chains-modeled-as-holding-companies.md)): each chain is a `company` typed `HOLDING_COMPANY`; distinct Properties link via `holdingCompany`/`holdingCompanyId` (inverse `subsidaries`). Detected from shared registrable domain; multi-domain chains fold by brand key (`princehotels.co.jp`\+`.com`; `hilton.com`\+`hiltonjapan.co.jp`), keeping all domains + subsidiaries. Names derived from member company names, `needs_review` for rename. 39 holdings / 181 subsidiaries in the 2026-06-17 upload record (`data/archive/2026-06-17-upload-record/`, gitignored).
+
+**Pipeline:** one script — `scripts/build.py` — runs `data/source/*.csv` → `data/out/` in-memory (extract → dedup → relations+holdings → normalize → emit; deterministic uuid5 ids, both person↔company directions, holdings, sample-schema-exact columns). Emits 5 files imported in order (Twenty upserts by `Id`): **1)** `companies_holdings.csv` **2)** `companies.csv` **3)** `people.csv` **4)** `companies_poc_update.csv` **5)** `people_company_update.csv` (PoC + company-link deferred — person↔company is a cycle, no M2M). Live-state verification is ad-hoc via `/graphql` (the one-off `_check_state.py` probe was retired 2026-07-16). The earlier per-stage scripts (`extract_stage1`, `dedup_stage2`, `map_relations`, `map_to_twenty`, `emit_twenty_csv`) have been folded into `build.py` and removed; their logic lives as the labelled stages within it.
+
+## Orphaned offerings (carry-forward to Resource stage)
+
+`Activities#99` ("Tea Ceremony") and `Artisans#158` ("Nara Fude") have real offering data but **zero supplier identity** — no company/person minted, so no provenance anchor. Must be manually resolved before they can become Resources. Sasha ruled on 2026-09-25 that the two rows stay without a supplier (`supplierdb-007`, won't do).
+
+## Example dialogue
+
+> **Dev:** "An interpreter has no company — do we create one to hang the offering off?" **Sasha:** "No. If a supplier is just a person, it stays just a person."

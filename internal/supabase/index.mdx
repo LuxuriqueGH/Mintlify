@@ -1,0 +1,56 @@
+---
+title: "Luxurique Supabase Documentation"
+sidebarTitle: "Introduction"
+description: "Canonical documentation for the Luxurique Supabase analytics capture layer that records every Twenty CRM record change into an append-only ledger and derives analytics from it."
+---
+
+This is the canonical documentation for **Luxurique Supabase** — the analytics capture layer that records every Twenty CRM record change into an append-only ledger and derives analytics from it.
+
+## How the docs are organized
+
+| Area | What lives here | Start here when… |
+| --- | --- | --- |
+| [`architecture.md`](architecture.md) | The system at a glance: purpose, data flow, layers, the time-dimension goal. | You want the big picture or are new to the repo. |
+| [`components/`](components/) | One succinct page per component (what it is, responsibilities, inputs/outputs, where it lives, gotchas). | You're changing or debugging a specific piece. |
+| [`adr/`](adr/) | Architecture Decision Records — one immutable page per load-bearing decision and _why_ it was made. | You're asking "why is it done this way?" or making a new structural decision. |
+
+Supporting docs in the repo root, aimed at different audiences:
+
+- [`../README.md`](../README.md) — operator quickstart (deploy + verify).
+- [`../guide.md`](../guide.md) — gentle, no-experience-assumed setup walkthrough.
+- [`../CLAUDE.md`](../CLAUDE.md) — AI/agent context and Twenty webhook facts.
+
+## Documentation conventions
+
+- **One concept per file.** Components and decisions each get their own page so they can be linked, diffed, and superseded independently.
+- **ADRs are append-only.** Don't rewrite history — when a decision changes, add a new ADR and mark the old one `Superseded by ADR-XXXX`. Mirrors the append-only spirit of the `activity_log` itself.
+- **Code is the source of truth; docs explain intent.** Every doc links to the file(s) it describes. When code changes, the linked doc is updated in the same change (see the maintenance rule below).
+- **Succinct over exhaustive.** A component page should fit on one screen. Reconstructable detail (full SQL, full handler) stays in the code.
+
+## Maintenance rule (load-bearing)
+
+**At the end of any change, update all documentation it touches** — component pages when a component's behavior changes, a new ADR when a structural/design decision is made, this index when a doc is added/removed, and the root `README.md` / `CLAUDE.md` when operator-facing or context facts change. Docs are part of the change, not a follow-up.
+
+This rule is backed by a `Stop` hook ([`.claude/hooks/docs-sync-reminder.js`](../.claude/hooks/docs-sync-reminder.js), wired in [`.claude/settings.json`](../.claude/settings.json)): if a turn changes source (`supabase/`, `scripts/`, `*.toml`) without touching any docs (`docs/` or a top-level `*.md`), it reminds you before the turn can finish.
+
+<CardGroup>
+  <Card title="Overview" icon="file" href="/internal/supabase/overview">
+    Operator quickstart for deploying and verifying the Supabase activity log.
+  </Card>
+
+  <Card title="Guide" icon="book" href="/internal/supabase/guide">
+    Step-by-step setup walkthrough with no prior Supabase experience assumed.
+  </Card>
+
+  <Card title="Architecture" icon="diagram" href="/internal/supabase/architecture">
+    The system at a glance: purpose, data flow, layers, and the time-dimension goal.
+  </Card>
+
+  <Card title="Error Codes" icon="alert" href="/internal/supabase/error-codes">
+    Pipeline Slack alert codes and their meanings: VB, RC, and SD ranges.
+  </Card>
+
+  <Card title="Components" icon="grid" href="/internal/supabase/components">
+    One page per component: what it is, responsibilities, inputs/outputs, and gotchas.
+  </Card>
+</CardGroup>

@@ -1,0 +1,50 @@
+---
+title: "Component: activity_log (the ledger)"
+sidebarTitle: "Activity Log"
+description: "The append-only activity_log table is the single source of truth for all Twenty CRM record changes, with a typed envelope plus flexible jsonb payload."
+---
+
+**File:** [`supabase/migrations/20260604120001_activity_log.sql`](../../supabase/migrations/20260604120001_activity_log.sql) **Related:** [ADR-0002](../adr/0002-generic-activity-log-jsonb-envelope.md), [ADR-0003](../adr/0003-append-only-derive-via-views.md), [ADR-0019](../adr/0019-enforce-activity-log-immutability.md) (append-only is **DB-enforced**: `BEFORE UPDATE/DELETE` trigger + `REVOKE UPDATE/DELETE/TRUNCATE` from `service_role`, `20260629170000_enforce_activity_log_immutability.sql`)
+
+## What it is
+
+The single source of truth: one append-only row per Twenty record change, for **every** object. A typed envelope (true for any change) plus a flexible jsonb payload (the full after-snapshot). New objects/custom fields need **zero schema change** — they land in `record`.
+
+## Schema
+
+| Column | Type | Notes |
+| --- | --- | --- |
+| `id` | `bigint` identity | PK. |
+| `dedup_key` | `text` **unique** | Idempotency; see [ADR-0004](../adr/0004-idempotency-dedup-key.md). |
+| `object` | `text` | e.g. `opportunity`, `person`, a custom object. |
+| `action` | `text` | `created` \| `updated` \| `deleted` (webhook; also the Logs replay of ADR-0047, removed 2026-09-25) · `destroyed` \| `restored` (webhook) · `deleted` \| `destroyed` (delete sweep, ADR-0042) · `snapshot` (backfill/reconcile delta, [ADR-0007](../adr/0007-historical-backfill-snapshot.md)). |
+| `record_id` | `uuid` | The changed record. |
+| `happens_at` | `timestamptz` | Webhook rows: Twenty `eventDate` (the webhook queue clock, not the record time). Snapshot rows: `record.updatedAt`. Sweep rows: `deletedAt` or the sweep time. Logs rows: the Logs `timestamp`. |
+| `actor` | `jsonb` | `{ userId, workspaceMemberId }`; **null for API-key writes**. |
+| `updated_fields` | `text[]` | Changed field **names** only (updates). No values/diff. |
+| `record` | `jsonb` (not null) | Full after-snapshot of the record. A `destroyed` row always has a `deletedAt`: when the record has none, the webhook (since 2026-09-25, `supabase-050`) and the delete sweep (ADR-0042) stamp the event time. Logs replay rows (ADR-0047) hold a lossy copy: null keys dropped, numbers as strings, naive dates. The 142 such rows were deleted on 2026-09-16 (`20260916120000`). |
+| `workspace_id` | `uuid` | Source workspace. |
+| `received_at` | `timestamptz` | Insert time (`default now()`), vs `happens_at`. |
+
+## Indexes
+
+- `(object, record_id, happens_at desc)` — "history of one record, in order" (the hot path for `LAG()` reconstruction).
+- `(happens_at desc)` — cross-object time-range scans.
+- `(object, received_at)` — per-object recency window (added by `20260722170000_schema_drift_single_pass.sql` for `schema_drift()`).
+
+**Dropped 2026-08-19:** the GIN index on `record` (`jsonb_path_ops`), created for "ad-hoc `record->>'field'` lookups". It could never serve that shape — `jsonb_path_ops` supports containment (`@>`) and path predicates only, never `->>` extraction — and nothing in the repo issues a containment query here. It recorded `idx_scan = 0` across 5,102 Preset queries since the 2026-06-18 stats reset while costing 28 MB and a GIN insert per captured webhook (`20260819140000_drop_unused_record_gin_index.sql`, closing the last live sub-item of BACKLOG #11). Recreate from `20260604120001_activity_log.sql` if a containment workload ever appears.
+
+## Contract / invariants
+
+- **Append-only.** Never `UPDATE`/`DELETE` a row (see ADR-0003). All derived state lives in [read models](projections.md).
+- **No diff** in the source data: only the after-snapshot + changed field names. Reconstruct from→to with `LAG()` over a record's ordered history.
+- `happens_at` (event time) and `received_at` (storage time) differ — use `happens_at` for analytics, `received_at` to diagnose delivery lag.
+
+## Gotchas
+
+- `record_id` is `not null` + `uuid`; events without a record id are dropped by the ingest function before they reach here.
+- **One deliberate ingest exclusion** (ADR-0036): `formulaDefinition.updated` events whose `updated_fields` contains _only_ names from the set `lastEvaluatedAt`, `lastValue`, `lastValueText`, `updatedBy` are dropped by [`twenty-webhook`](twenty-webhook.md) — the formula app's own job clock stamp, not a record change. So `formulaDefinition` history here is config-change + `lastError` history, **not** an evaluation timeline. Note the `reconcile` delta still writes `formulaDefinition` _snapshot_ rows when the run log bumps `updatedAt` (`supabase-048`). The set got `lastValueText` and `updatedBy` on 2026-09-25 (`supabase-071`).
+- The first row for any record has no predecessor → null `from_*` in transitions until the [backfill](backfill.md) seeds a baseline (ADR-0007). `snapshot` rows are written append-only like any other and carry `happens_at = record.updatedAt`.
+- **Scope: business objects, plus the `workflow`, `link`, and `member` objects** (ADR-0046). The `message`, `calendar`, `blocklist`, and `callRecording` objects are Twenty's sync state. The [`twenty-webhook`](twenty-webhook.md) function does not write them to the ledger. The migration `20260911120000_purge_sync_object_rows.sql` deleted these rows on 2026-09-11. It is the one break-glass DELETE on this table. It disabled the trigger, then it enabled the trigger again, in one transaction. A second break-glass DELETE, `20260916120000_purge_logs_replay_duplicates.sql`, removed 142 duplicate Logs-replay rows on 2026-09-16 (ADR-0047). The ledger decreased from 606,512 rows to 104,975 rows. New events add more rows after that.
+
+**Last modified:** 2026-09-25 UTC. The `action` row says that the Logs replay mode is removed; the run-log set holds four names; a `destroyed` row always has a `deletedAt`. Cause: Sasha's rulings on `supabase-073`, `supabase-071` and `supabase-050`. Actor: Claude Opus 5.5 (fix agent S1). Before that, on 2026-09-11: recorded the business-object scope and the purge (ADR-0046).

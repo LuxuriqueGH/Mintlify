@@ -1,0 +1,23 @@
+---
+title: "Superset / Preset.io — BI layer for Luxurique analytics"
+sidebarTitle: "Introduction"
+description: "Internal engineering wiki for the Superset/Preset.io BI layer. Covers connection wiring to Supabase, dashboard provisioning, chart definitions, and the inbox/outbox exchange workflow."
+---
+
+The Superset/Preset.io system is the BI layer for Luxurique analytics. It connects to Supabase as a read-only `preset_ro` role and owns no schema or data — only connection wiring, dashboard/chart definitions, and docs.
+
+This wiki covers how the system is wired, how definitions are provisioned, and how the exchange workflow keeps the repo in sync with the live Preset workspace.
+
+<CardGroup>
+  <Card title="Connection" href="/internal/superset/connection">
+    Wire Preset.io to Supabase as the read-only `preset_ro` role
+  </Card>
+
+  <Card title="Chart Guide" href="/internal/superset/chart-guide">
+    Plain-language definitions for every chart on the live dashboard
+  </Card>
+
+  <Card title="Vocabulary" href="/internal/superset/vocabulary">
+    The decided analytics lexicon for all reader-facing surfaces
+  </Card>
+</CardGroup>

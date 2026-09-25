@@ -141,6 +141,149 @@
             ]
           }
         ]
+      },
+      {
+        "tab": "Internal",
+        "groups": [
+          {
+            "group": "Overview",
+            "pages": [
+              "internal/index",
+              "internal/s-drive"
+            ]
+          },
+          {
+            "group": "Supabase",
+            "pages": [
+              "internal/supabase/index",
+              "internal/supabase/overview",
+              "internal/supabase/guide",
+              "internal/supabase/architecture",
+              "internal/supabase/error-codes",
+              "internal/supabase/twenty-schema",
+              "internal/supabase/components/index",
+              "internal/supabase/components/activity-log",
+              "internal/supabase/components/backfill",
+              "internal/supabase/components/bi-surface",
+              "internal/supabase/components/config",
+              "internal/supabase/components/drift-watch",
+              "internal/supabase/components/fetch-twenty-schema",
+              "internal/supabase/components/marketing-surface",
+              "internal/supabase/components/nas-backup",
+              "internal/supabase/components/projections",
+              "internal/supabase/components/reconcile",
+              "internal/supabase/components/twenty-webhook",
+              "internal/supabase/components/vero-bridge"
+            ]
+          },
+          {
+            "group": "n8n",
+            "pages": [
+              "internal/n8n/index",
+              "internal/n8n/context",
+              "internal/n8n/project-scope",
+              "internal/n8n/project-systems",
+              "internal/n8n/twenty-schema",
+              "internal/n8n/conventions/backfill-loop",
+              "internal/n8n/conventions/doc-cadence",
+              "internal/n8n/conventions/human-edit-gate",
+              "internal/n8n/conventions/mcp-usage",
+              "internal/n8n/conventions/scaffolding-vs-spec",
+              "internal/n8n/conventions/secrets",
+              "internal/n8n/conventions/source-charset",
+              "internal/n8n/conventions/twenty-error-guard",
+              "internal/n8n/references/m365-proxy-inbox",
+              "internal/n8n/references/n8n-cloud",
+              "internal/n8n/references/openrouter",
+              "internal/n8n/references/twenty",
+              "internal/n8n/specs/travel-advisories-brief-section",
+              "internal/n8n/specs/agency-slot-assignment",
+              "internal/n8n/specs/email-transform-split"
+            ]
+          },
+          {
+            "group": "Superset",
+            "pages": [
+              "internal/superset/index",
+              "internal/superset/connection",
+              "internal/superset/exchange",
+              "internal/superset/chart-guide",
+              "internal/superset/vocabulary",
+              "internal/superset/vocab-decision-plan",
+              "internal/superset/daygrain/build-plan",
+              "internal/superset/daygrain/build-plan-fy-removal",
+              "internal/superset/daygrain/research-charts",
+              "internal/superset/daygrain/research-db",
+              "internal/superset/daygrain/research-preset",
+              "internal/superset/daygrain/spec-chart150",
+              "internal/superset/daygrain/spec-consistency",
+              "internal/superset/daygrain/spec-fy-removal",
+              "internal/superset/daygrain/spec-migration",
+              "internal/superset/daygrain/spec-preset",
+              "internal/superset/daygrain/spec-verification"
+            ]
+          },
+          {
+            "group": "SupplierDB",
+            "pages": [
+              "internal/supplierdb/index",
+              "internal/supplierdb/context",
+              "internal/supplierdb/dedup-design",
+              "internal/supplierdb/twenty-schema"
+            ]
+          },
+          {
+            "group": "Twenty",
+            "pages": [
+              "internal/twenty/index",
+              "internal/twenty/twenty-schema"
+            ]
+          },
+          {
+            "group": "Vero",
+            "pages": [
+              "internal/vero/index",
+              "internal/vero/spec",
+              "internal/vero/prototype-plan",
+              "internal/vero/twenty-marketing-objects",
+              "internal/vero/webhook-payloads"
+            ]
+          },
+          {
+            "group": "Asana",
+            "pages": [
+              "internal/asana/index"
+            ]
+          },
+          {
+            "group": "QC Webapp (Internal)",
+            "pages": [
+              "internal/qc-web/index",
+              "internal/qc-web/spec",
+              "internal/qc-web/schema",
+              "internal/qc-web/architecture",
+              "internal/qc-web/design"
+            ]
+          },
+          {
+            "group": "STE-100",
+            "pages": [
+              "internal/ste100/index",
+              "internal/ste100/rules-digest",
+              "internal/ste100/sasha-rule-summary",
+              "internal/ste100/glossary/data",
+              "internal/ste100/glossary/ops",
+              "internal/ste100/glossary/qc-web",
+              "internal/ste100/glossary/qce",
+              "internal/ste100/glossary/shared",
+              "internal/ste100/specs/rewrite",
+              "internal/ste100/specs/backlog-standard",
+              "internal/ste100/specs/context-index",
+              "internal/ste100/specs/rollout",
+              "internal/ste100/specs/backlog-asana-sync"
+            ]
+          }
+        ]
       }
     ]
   }

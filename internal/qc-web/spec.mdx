@@ -1,0 +1,182 @@
+---
+title: "QC Webapp — Specification"
+sidebarTitle: "Spec"
+description: "Full specification for the QC Webapp rebuild. Covers architecture decisions, auth, collaboration, operation layer, audit, exports, and phased plan."
+---
+
+# QC Webapp — Specification
+
+**Status:** Architecture agreed 2026-08-17 (design discussion, Sasha + Claude). Phase 0 complete 2026-08-19 (docs/design/ARCHITECTURE.md refines this document — where they disagree, ARCHITECTURE.md and the L0 chunk doc win). L0 schema chunk in flight. This document is authoritative for the webapp; the originating decision record lives in the Excel repo at `QuotationCostingEngine/docs/proposals/2026-08-17-qc-webapp-rebuild.md`.
+
+## What this is
+
+A ground-up webapp rebuild of the Quotation and Costing Engine (QC Sheet), today an Excel VBA workbook (`QC-DEV.xlsb`, ~32.4k lines of VBA in `../QuotationCostingEngine`). Motivations, in order: diagnosability (failures become stack traces, not frozen windows), collaboration (a VBA workbook cannot co-author at all; the current workflow is drifting per-user copies), and maintenance floor (~60-70% of the VBA exists to fight Excel, not to do costing; webapp estimate is 7-10k lines, ~2-3k of it domain logic).
+
+## Decisions made (2026-08-17)
+
+| Question | Decision |
+| --- | --- |
+| Standalone vs Twenty app | **Standalone webapp.** Twenty's app SDK is real (verified against vendored source, checkout 2026-08-13) but its Remote DOM UI sandbox cannot host a data grid: DOM measurement APIs (getBoundingClientRect, ResizeObserver, offsetWidth) throw or fail silently — breaks every virtualized grid library. Optional phase-3: tiny Twenty app with a read-only side-panel widget (summary + deep link); rendering/styling/events are the part of the sandbox that works |
+| Excel-grid semantics | **Not needed.** Confirmed workflow: manual entry is one cell at a time; copy/paste is structural (row/group/section/tab within one QC), never free-form range paste. A structural clipboard replaces Excel semantics entirely |
+| Grid library | TanStack Table (MIT) with inline click-to-edit cells + keyboard nav. No AG Grid license, no Handsontable. Revisit only if real usage demands range paste |
+| Backend | **One Supabase project, zero servers.** Static SPA talks to Postgres directly via supabase-js + RLS. Only server-side code ever: one edge function for the Twenty push (API token cannot live in the browser) |
+| Where logic lives | **Dumb UI, smart database.** All money math, clipboard clones, and audit in Postgres (views, RPCs, triggers — **no computed money is ever stored**, L0). The UI displays what the DB says and never computes money |
+| Auth | Supabase Auth with Microsoft Entra ID (M365) OAuth, tenant-locked, no public signup. MFA/offboarding inherited from M365 |
+| Authorization | Global role on `app_user` + **`project_assignment` (scope `all`/`conditional`) + `quote_assignment`** (conditional-only grants), with RLS policies over DEFINER membership predicates (**corrected 2026-08-20 per session-5 / L0 R-16** — supersedes both this row's original `project_members` + admin/staff/viewer sketch and the interim `pl_assignment`). Roles: `none` (auto-provisioned, zero access) / `pl` / `sl` / `supervisor` / `admin`. Project assignment is the access gate; Supervisor+ see all by rule, SLs by removable auto-assignment. M365 proves who; the role + assignment rows say what (see `docs/design/chunks/01-l0-schema.md`) |
+| Undo | **Day-1 requirement.** Per-user Ctrl+Z via operation inversion (see Operation layer). Optimistic UI throughout — edits render instantly, sync in background |
+| Collaboration | Optimistic version check on writes — **field-level for cell edits** (the edited field's expected old value), **`updated_at` for structural ops** (L0 C-18; a row-level token mints false conflicts on parallel different-column edits and blocks undo). Supabase Realtime live sync + Presence per-row "X is editing" badges are **MVP**, not phase 2 (D-056/D-057; API verified current 2026-08-17); structural deletes go out as per-quote Broadcast (L0 C-15/S-9). No CRDTs, no hard locks — ruled out deliberately |
+| Supabase project boundary | **Separate project from the S-Drive analytics cluster.** Margin/cost data stays out of the project that external BI credentials (preset_ro, future vero_ro) attach to |
+| Availability | Paid Supabase tier from day 1; monitoring; long sessions; daily off-platform pg_dump. (The hourly read-only XLSX snapshot to SharePoint is **deleted** — D-068.) **Automatic write failover explicitly ruled out** (split-brain; see Availability). Optional phase-2+: local read-only live mirror via logical replication |
+| Hosting | Static SPA on Cloudflare Pages (free tier), custom domain `qc.luxurique.com` via CNAME, auto TLS. Deploy = git push |
+
+## Architecture
+
+Two pieces, no middle tier:
+
+1. **Supabase project** — Postgres (tables, RLS, views, RPCs, triggers), Auth (Entra ID), Storage (published PDFs + branded templates), Realtime (phase 2).
+2. **Static React SPA** — Vite + TypeScript + TanStack Table/Query + Tailwind + shadcn/ui + supabase-js. Cloudflare Pages; the app runs in the user's browser and talks directly to Supabase over HTTPS.
+
+Every failure mode is either a SQL error or a browser stack trace. Both name their origin.
+
+## Data model sketch
+
+Excel construct → webapp construct. **Table names are singular** (L0 convention; `user`/`group` are reserved words → `app_user`, `item_group`):
+
+| Excel | Webapp |
+| --- | --- |
+| Workbook copy per deal | `quote` row (a "QC") |
+| MainTable1..30 / Tab1..30 | `tab` rows (no 30 cap) |
+| Sections (row 1 = TITLE invariant) | `section` rows; invariants become DB constraints checked at commit |
+| Groups (GroupID, mod_Activating) | `item_group` rows — **first-class table** (L0 A-1 resolved, R-1); it is the priced unit, members carry `group_id` |
+| MainTable rows (47 cols A-AP) | `line_item` rows: ~20 entered fields, the rest computed. Full mapping derived in phase 0 from `../QuotationCostingEngine/docs/MainTable_DailyView_ColumnMap.txt` |
+| TabNLabels / MarkupMaster | `markup_master` (global seed) + `quote_label_rate` (the QC's current rate per label — the authority; MIXED-mode machinery deleted, D-031) |
+| SystemIndex | Gone (the DB knows its own rows) |
+| DailyView | One SQL view + a read-only grid |
+| Overview / OverviewTable | SQL views — **totals are computed views, never generated/stored columns** (L0) |
+| Quotation staging (TabNQ\_\*) | Gone — quotes render at export time from live data |
+| tAuditLog + Ver/GroupID bookkeeping | `audit_log` (see below), strictly more capable |
+| CF rules (mod_CFRules, 19 rules) | Declarative cell-class rules on the grid (same table-driven idea, CSS instead of FormatConditions) |
+| Brand selector (LUX/LXT/LBT sheets) | `brand` field on quote + per-brand export templates |
+
+## Operation layer (core architectural contract)
+
+**Every write goes through a typed operation. No component ever calls update() directly.** This single rule powers undo, audit, history-revert, and live sync coherently.
+
+Operation types (initial set): `cell_edit`, `row_insert`, `row_delete`, `bulk_edit`, `paste_clone` (row/group/section/tab), `move`, `section_op` (create/rename/delete). Structural ops are Postgres RPCs (transactional: fully land or nothing).
+
+Each operation:
+
+- carries an `operation_id` + human label ("pasted section 'Day 3' (14 rows)"),
+- stamps every audit row it produces with that id + full scope columns,
+- **knows its inverse**: cell_edit → restore old value; paste_clone → delete the created ids; delete → reinsert from audit old_data; move → move back; bulk_edit → restore per-row old values.
+
+**Undo/redo:** client-side per-user stack of inverses; Ctrl+Z executes the inverse as a normal (audited) operation. Conflict rule: inverse writes use the same optimistic check (field-level for cell edits, `updated_at` for structural ops — L0 C-18); on conflict, toast "can't undo — X changed this since" rather than stomping a colleague's edit. Undo entries appear in history like any operation.
+
+## Audit + version history
+
+- One `audit_log` table: timestamp, `user_id` (`auth.uid()`) — **nullable, paired with `actor_kind` human|system** (corrected at L0: schema migrations, partition jobs, and cron write with no `auth.uid()`; the third value `migration` was collapsed into `system` at L0 R-34, 2026-08-21), action, `old_data` jsonb, `new_data` jsonb, the denormalized scope columns `project_id / quote_id / tab_id /
+  section_id / group_id / line_item_id`, and the row identity `row_pk` / `row_uuid` (exactly one non-null — not a single `row_id`), plus `operation_id` FK to the `operation` header that carries the label.
+- One generic trigger function (~80 lines PL/pgSQL) on the data tables.
+- "Changes to this row/group/section/tab" = one indexed WHERE on a scope column.
+- Version history falls out: each entry stores full new state, so "row as of time T" = last entry before T; restore = one update from stored jsonb; operation-level revert ("undo this paste") = apply the operation's inverse.
+- **Get right on day one:** the operation_id grouping on structural ops. Trivial at write time, miserable to retrofit.
+
+## Auth flow (M365 / Entra ID)
+
+Verified against current Supabase docs 2026-08-17.
+
+1. Login page calls `supabase.auth.signInWithOAuth({ provider: 'azure', options: { scopes: 'email' } })` → browser navigates to `login.microsoftonline.com`.
+2. User authenticates to Microsoft (usually silent SSO; MFA per org policy). The app never sees a password.
+3. Microsoft redirects to Supabase's callback (`https://<project>.supabase.co/auth/v1/callback`) with a one-time code; Supabase exchanges it server-to-server, creates/finds the user.
+4. Supabase redirects back to `qc.luxurique.com` with a session: access JWT (1h default) + rotating single-use refresh tokens. supabase-js stores and auto-refreshes. Every DB request carries the JWT; RLS reads `auth.uid()` from it.
+
+Key facts:
+
+- **Tenant lock is NOT the default.** The Azure provider defaults to the `common` tenant (any Microsoft account). Must set the tenant URL to `https://login.microsoftonline.com/<tenant-id>` in Supabase Auth provider settings.
+- Microsoft is only involved at sign-in; session refresh is browser↔Supabase, so an Entra outage only blocks fresh logins.
+- New users auto-provision on first login with global role `none` and see nothing until a role grant (and, for a PL, an assignment) opens access. **The role + assignment rows, not Microsoft, are the kill switch** — offboarding via M365 disable has a refresh-window lag; setting the role back to `none` starves them of data on the next request (the role is read from the table, never from a JWT claim).
+
+## Collaboration
+
+- Cell edits commit atomically (click, type, Enter = one UPDATE), so character-level merging never arises.
+- Phase 1: optimistic check — cell edits compare the field's expected old value; structural/multi-column ops compare `updated_at` (L0 C-18); on conflict, flash + reload the cell.
+- MVP (moved from phase 2 — D-056/D-057): Realtime subscription on the open quote (colleagues' edits appear within ~1s) + Presence channel per quote broadcasting `{user, editing_row}`; badge renders on the row. Presence state is server-side ephemeral and auto-cleans on disconnect — no stale locks possible. ~80 lines.
+
+## Calculation engine
+
+Postgres owns all money math: markup resolution (category → label → the QC's `quote_label_rate`, overridable per row), sell/totals as **views** (never generated or otherwise stored columns — L0). Payment policies/schedules/tracking are **deleted** (session-4, D-042/D-043), so mod_PaymentApply is no longer a port source. Port sources for semantics (in `../QuotationCostingEngine/src/modules/`): mod_MarkupApply (2,741 lines), mod_CategoryValidation (1,076).
+
+## Exports
+
+- **PDF:** print-styled quote page + browser Save as PDF. No server.
+- **Word:** docxtemplater (MIT core) + PizZip, running in the browser. Reuses the existing branded .docx templates (today stored in Custom XML Parts by mod_WordTemplateStore; migrated to Supabase Storage). Port sources: mod_WordTemplate / mod_WordExport / mod_WordDataExtractor.
+- **XLSX** (if still wanted): exceljs (MIT).
+- Three brands = three template sets + brand-conditional rendering.
+
+## Availability
+
+Design target: shared downtime rare and short, and never paralyzing (staff can always _see_ current quotes).
+
+1. Paid Supabase tier from day 1 (free tier pauses on inactivity; paid = backups, PITR, support).
+2. Monitoring + alerts (UptimeRobot free + Sentry).
+3. Long session lifetimes (an Entra hiccup never logs anyone out mid-day).
+4. Daily `pg_dump` to a second location (R2 or local). Data is portable Postgres, never hostage.
+
+**Deleted: the hourly read-only XLSX snapshot to SharePoint** (D-068). It was drafted as the outage fallback for viewing/quoting; the phase-2+ local read-only mirror below is that fallback instead, and the snapshot would have been a second half-current copy of the costing data to keep in sync and to secure.
+
+**Ruled out: automatic write failover** to a local replica. Split-brain risk (a network blip forks two write histories of the same quote — silent data corruption, strictly worse than downtime), no automatic failback in Postgres, and the local box is flakier than managed Supabase. Optional phase-2+: **local read-only live mirror** via logical replication (Docker Postgres subscribing to the Supabase primary) — the app falls back to it in read-only mode automatically; promoting it to primary is a deliberate, manual, break-glass decision only.
+
+## Hosting + go-live
+
+1. Connect this repo to Cloudflare Pages (build command + output dir); every push auto-deploys.
+2. Custom domain `qc.luxurique.com`: add the CNAME Pages specifies, wherever luxurique.com DNS is managed. TLS automatic.
+3. Supabase Auth URL configuration: site URL + allowed redirect = `https://qc.luxurique.com`.
+4. Entra app registration redirect URI = `https://<project>.supabase.co/auth/v1/callback`.
+
+## Twenty integration (phase 3)
+
+One Supabase edge function holding the Twenty API token pushes GRANDTOTAL / gross cost / PAX / dates to the matching opportunity (update-only; field map per the Excel-era proposal `QuotationCostingEngine/docs/proposals/2026-07-15-twenty-opportunity-push.md`, whose n8n-proxy design this supersedes post-cutover). Optional phase-3b: minimal Twenty app (twenty-sdk) shipping a read-only side-panel front component on the opportunity — quote summary + deep link into the webapp.
+
+## Library bill of materials
+
+All free/MIT unless noted: Vite, React, TypeScript, TanStack Table, TanStack Query, Tailwind, shadcn/ui, supabase-js, dnd-kit (drag reorder), docxtemplater core + PizZip, exceljs (optional), Sentry (free tier). Hosting: Cloudflare Pages free tier. Supabase paid tier ~USD 25/mo. **Total recurring cost estimate: USD 25/mo.** No paid grid license (consequence of the no-range-paste decision).
+
+## Security summary
+
+- Browser holds the anon key only; **RLS is the boundary**. Service-role key exists only in local tooling/CI for migrations. Twenty token only in edge function env.
+- Tenant-locked M365 SSO, no public signup; access revocation = set the global role to `none` or drop the assignment row (instant) and/or disable the M365 account.
+- No cost/margin hiding for any role (D-046). Sensitive `app_user` columns are Supervisor+ only; names reach everyone else through a DEFINER directory surface (L0 R-15).
+- Separate Supabase project from the analytics cluster (blast-radius isolation).
+- Backups: Supabase daily backups / PITR + item 4 under Availability.
+
+## Migration + cutover
+
+**No migration — the app starts empty** (ruled 2026-08-20, L0 R-23). Legacy QC workbooks are **not** loaded into the new app; they stay archived as files, and the QuotationCostingEngine repo stays as their record. In-flight Excel quotes finish in Excel. Nothing in the schema carries legacy correspondence keys. Any future importer would be its own gated chunk with its own rulings.
+
+## Phased plan (solo + Claude Code, part-time estimates)
+
+Construction follows `docs/BUILD_PROTOCOL.md` (gated chunks, adversarial design review, executed fixtures for money math, DOC TIME). The protocol roughly doubles these raw estimates (MVP ~17-21 wks); accepted deliberately 2026-08-17; re-estimated at chunk-02 RESEARCH + CHALLENGE 2026-08-21 (comments + inbox added to MVP) and again at the chunk-02 approval-block rework 2026-08-21 (author delete + day-1 threading).
+
+| Phase | Scope | Estimate |
+| --- | --- | --- |
+| 0 | Schema spec from column map + markup/payment semantics extraction; Supabase project + auth walking skeleton; grid spike (TanStack inline editing feel test) | ~1 week |
+| 1 (MVP) | Projects/membership, quote editor (tabs/sections/rows, inline edit, quick-add, multi-select bulk edit), calc engine, structural clipboard RPCs, operation layer + undo, audit trigger, threaded comments + @mentions + in-app inbox (D-093), PDF export | 8.5-10.5 weeks |
+| 2 | Word export, MarkupMaster + PaymentMaster admin screens, history UI (drawer + diffs + restore), DailyView, availability items 2-4 (Realtime live sync + presence badges **moved to MVP** — D-056/D-057, ARCHITECTURE §10) | 3-5 weeks |
+| 3 | Twenty push edge function; optional Twenty side-panel widget; optional local read-only mirror (migration tooling dropped — R-23) | 2-4 weeks |
+
+## Risks
+
+1. **Grid feel acceptance** — staff are Excel-native. Mitigation: phase-0 spike goes in front of a real user (Theo/Koharu) before phase 1 commits; clipboard + quick-add
+   - bulk edit are the make-or-break interactions.
+2. **Implicit VBA rules** — years of edge cases (section invariants, MIXED-mode markup, rounding, sort semantics) live in code. Mitigation: the Excel repo's docs/modules/ + CONTEXT.md are unusually complete; phase 0 extracts semantics into the schema spec with citations.
+3. **Word template fidelity** — was hard in VBA, will need fiddling in docxtemplater. Budgeted in phase 2.
+4. **Scope creep toward a spreadsheet** — any request for "just let me type a formula" reopens the disease. The operation layer + structured fields are the contract; formula-like needs become named computed columns in the DB.
+
+## Open questions (phase 0 answers these)
+
+- ~~Are groups a first-class entity or a column on line_items?~~ **Answered:** first-class `item_group` (L0 R-1).
+- ~~Exact entered-vs-computed split of the 47 columns.~~ **Answered:** `docs/design/phase-0/session-2-costing-mechanics.md:37-48`.
+- ~~Does any role need cost/margin hidden from day 1?~~ **Answered:** no (D-046).
+- Supabase org/account for the new project.
+
+**Last modified:** 2026-08-20 UTC

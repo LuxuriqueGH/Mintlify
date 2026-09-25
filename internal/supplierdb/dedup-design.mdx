@@ -1,0 +1,61 @@
+---
+title: "Dedup Design: Stage Two of SupplierDB Migration"
+sidebarTitle: "Dedup Design"
+description: "Company and person deduplication rules for SupplierDB migration into Twenty, with conservative auto-merge tiers and profiling counts from staged data."
+---
+
+# Dedup design — stage two
+
+Runs as the dedup stage inside `scripts/build.py` (source → `data/out/`), on the in-memory aggregated tables. Grounded in profiling of the actual data (counts below), not assumed keys. Confidence bar: **Conservative** — auto-merge only on strong keys; everything weaker is flagged `needs_review` for a human. See [CONTEXT.md](../CONTEXT.md) for the domain rules.
+
+## Why the obvious keys are wrong here
+
+Twenty's own unique keys (`company.domainName`, `person.emails.primaryEmail`) are **unsafe as dedup keys for this data**:
+
+- **Chain-domain trap.** 47 of 74 multi-row domain clusters are hotel/brand chains — `marriott.com` → 9 _distinct_ properties, `hyatt.com` → 9, `discoverasr.com` → 6 (Citadines/Oakwood/Ascott). Merging on domain would collapse ~138 real distinct suppliers into a handful. Domain is a corroboration signal **only**, never a merge trigger on its own.
+- **Role-mailbox trap.** 24 of 39 duplicate-email clusters are shared role inboxes (`info@`, `inbound@vmc.co.jp` → 12 rows, `sales@`, `reservations@`). Merging people on these would falsely fuse 61 unrelated rows. Only personal (dotted local-part) emails are identity.
+
+## Company dedup — NAME-primary
+
+Normalize name: trim, collapse whitespace, lowercase. (Suffix stripping 株式会社/Co.,Ltd deferred to fuzzy tier.)
+
+| Tier | Rule | Action | Scope |
+| --- | --- | --- | --- |
+| Strong | exact norm-name **and** domain agrees or is absent | **auto-merge** | 32 clusters |
+| Weak | exact norm-name but domains **disagree** | flag `needs_review` | 12 clusters |
+| Never | shared domain, **different** names (chain) | leave separate | 185 rows |
+| Forced | identical **full website URL** (Twenty `domainName` is UNIQUE) | merge, flag if names differ | 6 groups |
+| Defer | fuzzy name (property variants, JP/EN pairing) | flag only | — |
+
+The **Forced** tier resolves the ADR-0002 landmine at emit time: Twenty rejects duplicate `domainName.primaryLinkUrl` on import, so companies sharing an _exact_ URL must merge. This is URL-_identity_, distinct from the shared-_domain_ chain trap (Marriott properties have distinct paths → untouched). 6 groups / 7 rows; names differed in all → flagged.
+
+Cross-category exact-name matches (e.g. _Grand Hyatt Tokyo_ in Accommodation + Venues) **do merge** — one real org. The canonical record keeps all category memberships (industry = primary + retain others); both source rows preserved for their resources.
+
+## Person dedup — PERSONAL-email-primary
+
+| Tier | Rule | Action | Scope |
+| --- | --- | --- | --- |
+| Strong | same **personal** email (dotted local part, not a role inbox) | **auto-merge** | 83 rows |
+| Never (on email) | same role mailbox (`info@`, `sales@`, …) | not an identity key | 61 rows |
+| Weak | same norm-name **and** same canonical company | flag `needs_review` | subset |
+| Weak | same norm-name, different/no company | flag `needs_review` | — |
+
+Conservative bar: **only personal-email auto-merges people.** All weak signals (role mailbox, name+company, name-only) are _flagged_ for a human, never auto-merged.
+
+## Merge mechanics — linkage is sacred
+
+A merge collapses members to one **canonical** record but **retains every contributing `source_file#source_row_id`** as a member list (e.g. _Japanese Cultural Experience_×13, _Life-Kyoto_×5 → 1 company each, carrying all their source rows). The Resource stage re-reads those rows and attaches each offering to the canonical entity. No provenance is dropped. Canonical field values: prefer the most-complete / longest non-blank per field; conflicts on flagged clusters left for human.
+
+Note: a same-name supplier whose rows carry **different domains** (e.g. _Tangonian_ — one tour on `kyoto-katana-tour.com`, others on `tangonian.com`) is **not** auto-merged under the Conservative bar — all members are flagged `name match, domain conflict` for a human, who confirms the merge. This is the deliberate trade-off: fewer false merges, more review.
+
+## Downstream — resolved via Holding Companies (relations stage, `build.py`)
+
+The chain-domain landmine (`domainName` can't be the upsert key — it would fuse all 9 Marriott properties) is resolved by **not collapsing chains at all**: each chain becomes a `HOLDING_COMPANY` and its distinct properties link via `holdingCompany`. Properties keep their own identity; the chain is captured as the parent. Chains spanning multiple domains fold into one holding by brand key (`princehotels.co.jp`\+`.com`; `hilton.com`\+`hiltonjapan.co.jp`). See ADR-0004. Output: `data/out/companies.csv`, `people.csv`. The 2026-06-17 upload record (`data/archive/2026-06-17-upload-record/`, gitignored) holds 847 deduped companies + 39 holdings. This line gave 839 + 43 before 2026-09-25.
+
+Person↔company is emitted across the two 1:N relations (`companyId`/`people` and `pocId`/`companyPoc`) — Twenty has no M2M; see ADR-0003.
+
+## Profiling provenance
+
+Counts from `data/staged/` (915 companies, 567 people): domain clusters 74 (47 chain / 24 true-dup / 3 mixed); exact-name collapses 68 rows (32 domain-agree, 12 conflict); personal-email collapses 83 rows; role-mailbox false-collapse risk 61 rows.
+
+**Last modified:** 2026-09-25 UTC. Corrected the counts of the 2026-06-17 upload record (847 deduped companies + 39 holdings, counted from the record files). Cause: the docs pass of the 2026-09-25 backlog walk. Actor: Claude Opus 5.5 (docs-pass agent).

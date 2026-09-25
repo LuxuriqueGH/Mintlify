@@ -1,0 +1,18 @@
+---
+title: "Vero: Email Marketing Layer for Luxurique"
+sidebarTitle: "Introduction"
+description: "Vero-side authority for Luxurique email marketing: audience SQL, dashboard configuration, campaign conventions. DB objects in Supabase, person records in Twenty."
+---
+
+# Vero — email marketing layer (operator quickstart)
+
+This repo is the Vero-side authority for the email marketing of Luxurique: audience SQL, Vero dashboard configuration, campaign conventions. It has no schema and no data. The DB objects are in `../Supabase`, and the person records are in Twenty.
+
+**Status: spec stage.** No Vero account yet, nothing built.
+
+- **Specification:** [`SPEC.md`](SPEC.md) — the full subscriber loop of Vero and Twenty (doc-verified 2026-08-14).
+- **Agent information:** [`CLAUDE.md`](CLAUDE.md).
+- **Open work:** [`BACKLOG.md`](BACKLOG.md) (indexed at `../BACKLOG.md`).
+- **Vero selection:** the selection date of Vero is 2026-08-14. This decision replaced the MailerLite part of the verdict in `../Martech/tournament/70-report.md`.
+
+**Last modified:** 2026-09-18 UTC. The ste100 toolkit rewrote the prose of this file in ASD-STE100 Issue 9 (Simplified Technical English). Headings, code, links, tables, numbers, names, and ADR decisions are unchanged. Cause: the documentation rewrite run `2026-09-08-all-repos` for every repo in the workspace. Actors: opus rewrite agent, opus review agent (2 meaning drifts fixed), then `tools/land.py` committed the file and wrote this stamp.

@@ -1,0 +1,40 @@
+---
+title: "Component: nas-backup (scheduled off-site pg_dump)"
+sidebarTitle: "NAS Backup"
+description: "Nightly logical dump of the entire Supabase Postgres database to an encrypted Synology NAS folder via Docker container; 120-day retention."
+---
+
+**Lives:** on-prem Synology NAS (DSM 7), not in this repo — this page is the record. Set up 2026-08-28.
+
+## What it is
+
+A nightly logical dump of the entire Supabase Postgres database to an encrypted folder on the office Synology NAS. Independent of Supabase's own platform backups — this copy is under our control, on our hardware, and survives project deletion or account loss.
+
+## How it works
+
+DSM Task Scheduler (root, daily 03:00) runs a shell script on the NAS:
+
+1. A throwaway `postgres:17-alpine` Docker container runs `pg_dump` against the Supabase **session pooler** (port 5432 — the NAS is IPv4-only; the direct DB host is IPv6).
+2. Output is gzipped to `twenty_<YYYYMMDD_HHMM>.sql.gz` in the backup folder, written to a `.tmp` file first and renamed only on success — a failed dump never leaves a truncated file that looks like a backup.
+3. `find -mtime +120 -delete` prunes dumps older than **120 days**.
+
+The connection string lives in a root-only (`chmod 600`) `.env` file next to the script, using the `postgres` role's password. That password is used **nowhere else** (verified at setup: capture/backfill use the service-role key; `preset_ro` / `rudder` / `vero_ro` are separate logins) — so it can be rotated by updating the dashboard + the NAS file, touching nothing else.
+
+## Storage
+
+Encrypted Btrfs shared folder with data checksums, admin-only permissions. The encryption key auto-mounts on boot (so scheduled runs survive a reboot); key file is stored off the NAS. Dumps are a few MB gzipped — 120 days is well under 1 GB.
+
+## Restore
+
+```sh
+zcat twenty_<stamp>.sql.gz | psql "<session-pooler-URI>"
+```
+
+Restore into a fresh/empty database (the dump contains schema + data). For a partial recovery, extract the relevant `COPY` blocks or restore to a scratch database and copy rows over.
+
+## Gotchas
+
+- **pg_dump client must be ≥ server major.** Server is Postgres 17 today; if Supabase upgrades majors, bump the container image tag in the script.
+- **Docker package must stay running** on the NAS (auto-starts on boot; the dump container itself is `--rm`, alive ~1 min/night).
+- **Failure alerting** is DSM's task email ("on abnormal termination"), if the NAS has notifications configured. There is no Supabase-side monitor for this — check the folder occasionally.
+- The dump contains **full row-level CRM data** (`activity_log` and all). The folder's encryption + permissions are the control; never widen the share.

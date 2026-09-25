@@ -1,0 +1,112 @@
+---
+title: "Error codes — pipeline Slack alerts"
+sidebarTitle: "Error Codes"
+description: "Reference for pipeline Slack alert codes: VB (Vero bridge), RC (reconcile), and SD (schema drift) ranges, with severity, behavior, and remedies."
+---
+
+Every pipeline Slack alert opens with a code. This page holds the detail behind each one. Ranges: **VB-0x** = `vero-push` (outbound, Twenty → Vero) · **VB-1x** = `vero-processor` (return, Vero → Twenty) · **VB-2x** = SQL-side bridge liveness · **RC-xx** = reconcile backstop · **SD-xx** = schema-drift watch (the pre-bridge alerts, coded 2026-08-28). One exception to the ranges: **VB-16** is posted by both functions, because one approval model serves both guards (ADR-0044). Component page: [`components/vero-bridge.md`](components/vero-bridge.md).
+
+Alert severity: `:rotating_light:` = something is paused or lost without action; `:warning:` = informational, verify when convenient; `:information_source:` = routine intended behavior, no verification needed.
+
+Message format (Sasha, 2026-08-28 — simple and skimmable, no jargon): line 1 = bold `[VB-xx] <short title>`; line 2 = one plain sentence of what happened; line 3 = `Action:` what to do (or "none"); last line = `ID:` any record/event ids, kept separate so they don't crowd the sentence.
+
+---
+
+## VB-01 — mass-vanish guard tripped (`vero-push`, halt)
+
+- **What happened:** more than `max(5, 10%)` of the shadowed audience was absent from `marketing.synced()` in one tick. The push treats this as a broken read (dropped view, renamed Twenty field, bad migration), not as real removals, and makes **zero** Vero calls. Since the 2026-08-27 delete ruling the vanish fail-safe is an irreversible `users/delete`, so this guard is what stands between a broken read and audience-wide data loss.
+- **System behavior:** the tick exits before any call or shadow write, so the guard re-evaluates every 5 minutes and clears itself once the source returns normal counts. `last_ok_at` is still written (the guard alert must not also drag in VB-21). Heartbeat note: `guard=mass_vanish absent=N live=M`.
+- **Remedy:** press **Approve deletes** in Slack when the people really did leave the list; the next tick runs the deletes with every per-delete guard still in force (debounce, in-flight check, membership re-read). Otherwise leave it halted and fix the source: `select count(*) from
+  marketing.synced()` as service role; if low/zero, check recent migrations touching `person_current` or the `marketing` schema, and Twenty field renames (`schema_drift()`). Bulk _status edits_ in Twenty do NOT trip this — only absence does (a deliberate 2026-08-26 ruling: bulk edits propagate unguarded). **Mute 24h** silences the repeat while you work.
+- **False positives:** synthetic rows inserted for drills (see the T8 drill in the component page); a genuine mass data-deletion in Twenty would also trip it — in that case the pause is doing its job, escalate before re-arming.
+
+## VB-02 — consent-history notice on a new person (`vero-push`, notice)
+
+- **What happened:** the first-ever track of a NEW person id carries an email address that held a revoked status (unsubscribed/bounced/complained) under a _different_ person id in the past (merge or delete-and-recreate).
+- **System behavior:** the person IS tracked into Vero per Twenty's current status (Twenty is the truth, 2026-08-26 ruling) — the alert is provenance review only.
+- **Remedy:** confirm the SUBSCRIBED grant in Twenty is intentional for this address. If not, set the person UNSUBSCRIBED in Twenty; the next tick suppresses them in Vero.
+
+## VB-03 — recreated + resubscribed after the vanish fail-safe (`vero-push`, notice)
+
+- **What happened:** a person vanished from the source long enough for the fail-safe to DELETE their Vero profile (2026-08-27 ruling: outside `marketing.synced()` = must not exist in Vero), then reappeared SUBSCRIBED in Twenty. The push recreated the profile (`users/track`) and called `users/resubscribe`.
+- **System behavior:** no action needed by design; the alert exists because an automatic resubscribe is consent-adjacent and must never be silent. The deleted profile's Vero-side history is gone — the recreated profile starts clean (telemetry already projected into Twenty survives).
+- **Remedy:** none, unless the disappearance has no explanation (then check what removed them from `marketing.synced()` — see VB-01 causes).
+
+## VB-04 — recreated + re-suppressed after the vanish fail-safe (`vero-push`, notice)
+
+- **What happened:** a person reappeared after the vanish fail-safe deleted their Vero profile, and their Twenty status is revoked. The push recreated the profile (`users/track`) and immediately re-suppressed it (`users/unsubscribe`) — a bare re-track would have left it mailable.
+- **System behavior / remedy:** correct outcome, no action.
+
+## VB-05 — Vero profile deleted (`vero-push`, info)
+
+- **What happened:** a person left `marketing.synced()` (status cleared to NULL, or the record deleted in Twenty) and survived the debounce + in-flight + membership checks, so their Vero profile was deleted (`users/delete` — profile, Vero-side history and suppression entry all gone; ADR-0041). The one irreversible call in the bridge is never silent — but it is routine intended behavior, so it posts at info level (`:information_source:`), not warning (Sasha, 2026-08-28).
+- **System behavior:** shadow row marked `gone_at`; the processor suppresses any late state event for the person (no resurrection).
+- **Remedy:** none if the Twenty change was intentional (this is the designed outcome, incl. privacy purges). If accidental, re-grant a status in Twenty — the profile is recreated from Twenty state (VB-03/VB-04).
+
+## VB-06 — profile deletion deferred over an hour (`vero-push`, notice)
+
+- **What happened:** a person left the subscriber source more than an hour ago, but their `users/delete` is still deferred because a `pending` `vero_events` row for them has not drained (deliberate: never delete with their events in flight).
+- **System behavior:** the delete retries every tick and fires on its own once the queue drains; this notice re-fires each tick until then.
+- **Remedy:** find the stuck row (`select * from vero_events where status =
+  'pending' and (person_id = '<id>' or user_email = '<email>')`). A Twenty outage backing off is the usual cause — wait it out or fix per VB-11 if it strikes out.
+
+## VB-11 — event failed after max strikes (`vero-processor`, halt)
+
+- **What happened:** a webhook event failed a **non-retryable** Twenty write 5 times and was parked as `status='failed'`. Retryable failures (network, 5xx, 408/429, rate limit) never strike — this is a persistent error such as a schema mismatch or invalid payload.
+- **System behavior:** the row keeps its full error in `vero_events.last_error` (kept out of Slack deliberately — Twenty error text can echo emails and internal schema names). Max 3 verbatim alerts per tick, then one aggregate.
+- **Remedy:** read `last_error`, fix the cause (often a Twenty field rename — write-side renames alert by failing), then replay: `update vero_events set status='pending', attempts=0 where id = <id>;`
+
+## VB-12 — crash-loop poison pill (`vero-processor`, halt)
+
+- **What happened:** an event's `claims` counter outran `attempts + backoffs` by more than 3 — it was repeatedly claimed but the run crashed before any outcome was recorded. The sweep parks it as `failed` so it cannot take the whole batch down every tick.
+- **System behavior:** one aggregated alert per sweep, however many rows.
+- **Remedy:** inspect the row's `payload` (likely malformed in a way that crashes processing). Then press **Retry events** in Slack to set every swept row back to `pending` with `attempts`, `backoffs` and `claims` reset, or **Discard events** to mark them `skipped` for good. Both buttons act only on rows still `status='failed'`, so a row you already repaired by hand is left alone and the reply says "Nothing to change". The SQL path still works: `update vero_events set status='pending', attempts=0, claims=0 where id = <id>;`
+
+## VB-13 — state-flip cap tripped (`vero-processor`, halt)
+
+- **What happened:** more than `max(5, 10% of audience)` people changed subscription state in one tick. Vero's webhooks are unsigned, so a flood of state flips can mean forged POSTs; the processor pauses ALL Twenty state writes for the tick.
+- **System behavior:** every claimed event is released (claims decremented) and retried next tick — nothing is lost; the guard re-fires until the queue clears review. `last_ok_at` still written. Note: `guard=flip_cap`.
+- **Remedy:** press **Approve release** in Slack when this was a real bulk edit; the next tick applies the changes once and posts `VB-16`. Otherwise inspect recent `vero_events` (`payload`, `received_at`). If forged: rotate `VERO_WEBHOOK_TOKEN` (edge secret) AND update the webhook URL in Vero's dashboard, then mark the forged rows `skipped`. If legitimate (e.g. a mass bounce from a bad send), delete no data — raise the audience denominator question with the operator before resuming. **Mute 24h** silences the repeat while you work.
+- **Known benign case:** first drain after arming with an empty/near-empty shadow (audience floor is 5).
+
+## VB-14 — ordering guard skipped a revocation (`vero-processor`, notice)
+
+- **What happened:** an unsubscribe/bounce/complaint arrived carrying a timestamp older than a state change already applied for that person, so it was skipped (applying it would resurrect stale state). A skipped _revocation_ is compliance-relevant, so it alerts; skipped resubscribes don't.
+- **Remedy:** check the person's `marketingEmailStatus` in Twenty against reality (their Vero profile page shows current suppression). If Twenty is wrong, correct it in Twenty — the push mirrors it out.
+
+## VB-15 — telemetry pair skipped (`vero-processor`, notice)
+
+- **What happened:** engagement stats for one (campaign, person) pair could not be written to Twenty for a non-retryable reason — usually the person is unresolvable (no/ambiguous email match) or a campaign/person record is in Twenty's trash (trashed records hold unique indexes: creates fail, queries return empty).
+- **System behavior:** the pair's events are marked `skipped`; one alert per campaign per tick. Telemetry is a projection recomputed from all events, so a later replay rebuilds full counts.
+- **Remedy:** read `vero_events.last_error`. Trashed record → restore it in Twenty and replay the rows (VB-11 recipe). Unresolvable person → usually a test/canned event with a fake email; leave skipped.
+
+## VB-16 — approved release used (`vero-push` / `vero-processor`, info)
+
+- **What happened:** someone pressed **Approve release** (VB-13) or **Approve deletes** (VB-01) in Slack, and the next tick consumed that approval instead of halting. This is the only code posted by both functions: one approval model serves both guards (ADR-0044).
+- **System behavior:** the approval is marked consumed with a note of the counts it released (`flips=N audience=M`, or `absent=N live=M`), and the heartbeat note leads with `guard=<name> override=<id>`. The release covers ONE tick. If the same condition holds next tick, the halt alert returns with its buttons. On the push side every per-delete guard still runs — the debounce, the in-flight `vero_events` check and the fire-time membership re-read. `vero-push` spends at most 200 calls per tick, so an approved deletion set larger than 200 needs one Approve click per tick, and an approval whose deletes all defer is still spent — VB-01 returns next tick with its buttons. **Mute 24h** hides a halt from Slack for 24 hours, and the halt paths still write `last_ok_at`, so the VB-21 dead-man stays quiet too; the bridge can be halted and silent for a day. Deploy order for any future redeploy: migration → `slack-actions` → `vero-processor` → `vero-push`.
+- **Remedy:** none. This is the designed outcome of a deliberate human approval. If the release looks wrong after the fact, read `vero_bridge_overrides` for who approved it and when (`granted_by`, `granted_at`, `consumed_note`).
+
+## VB-21 — bridge stale / dead-man (SQL liveness cron, halt)
+
+- **What happened:** neither push nor processor has recorded a fully successful run (`last_ok_at`) in over 30 minutes. Twenty↔Vero sync is stalled: revocations are queuing, trait changes are not flowing.
+- **System behavior:** fires every 15 minutes until healed. `last_ok_at` freezes on _attempted-call_ failures only — a rotated `TWENTY_API_TOKEN` or `VERO_AUTH_TOKEN` surfaces here even while `last_run_at` stays fresh.
+- **Remedy:** check edge-function logs (dashboard → Functions) and `net._http_response` for the cron POSTs' status codes. Common causes: rotated/revoked API token (VB-21 with `call_failures>0` in the heartbeat note), Vero or Twenty outage (self-heals), Vault `vero_bridge_secret` mismatch with the edge secret (every call 401s).
+- **Expected during large backfill drains:** sustained `LIMIT_REACHED` rate limiting freezes `last_ok_at` by design — a VB-21 during a big drain is expected back-pressure, not a failure.
+
+---
+
+## RC-01 — reconcile backstop stale (`reconcile-liveness` cron, halt)
+
+- **What happened:** the `reconcile` edge function (recovers dropped Twenty create/update webhooks via an `updatedAt` delta, every 10 min) has no successful heartbeat in over 35 minutes — dropped webhooks are not being recovered.
+- **System behavior:** the hourly `reconcile-liveness` cron re-fires until a run succeeds. Capture via `twenty-webhook` is unaffected (separate path).
+- **Remedy:** check the reconcile edge-function logs and `net._http_response` for the cron POSTs' status codes; a rotated `TWENTY_API_TOKEN` or Vault `reconcile_secret` mismatch are the usual causes. Detail: [`components/reconcile.md`](components/reconcile.md).
+
+## SD-01 — schema drift (`schema-drift-watch` cron, notice)
+
+- **What happened:** the analytics read layer references Twenty field keys that no longer appear in fresh `activity_log` envelopes (BROKEN status in `schema_drift_state`) — usually a Twenty field rename. Affected view columns are silently NULL for new events. NEW_UNREAD fields ride along as info.
+- **System behavior:** daily re-check (07:00 JST); re-fires until repaired.
+- **Remedy:** apply the repair recipe (coalesce bridge + tombstone) in [`components/drift-watch.md`](components/drift-watch.md).
+
+---
+
+**Last modified:** 2026-09-04 UTC

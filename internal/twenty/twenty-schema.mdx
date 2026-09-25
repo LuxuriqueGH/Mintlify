@@ -1,0 +1,50 @@
+---
+title: "Twenty CRM Schema Introspection and API Reference"
+sidebarTitle: "Schema"
+description: "Twenty CRM GraphQL schema dumps from /metadata and /graphql endpoints. How to refresh, read, and build API calls against the live workspace."
+---
+
+# Twenty CRM Schema
+
+Generated from the `/metadata` GraphQL endpoint (no trailing slash — that returns 405). Two files, both refreshed by `python scripts/fetch-twenty-schema.py`:
+
+## Files
+
+- `metadata-schema.json` — normalized dump of every object and every field with **all scalar properties Twenty exposes**: `defaultValue`, `settings`, `options` (for SELECT / MULTI_SELECT / RATING), `icon`, `description`, `isSystem`, `isUnique`, `isLabelSyncedWithName`, plus nested `relationDefinition` / `labelIdentifierFieldMetadata` / `imageIdentifierFieldMetadata` flattened to their identifier fields.
+- `introspection.json` — raw GraphQL introspection of every type, enum, input, query, and mutation exposed at `/metadata`. Source of truth for what can be queried or mutated against this workspace (use it to discover available mutations like `createOneField`, input shapes, enum values, etc.).
+
+## How the script finds the endpoint
+
+Auto-derives the workspace base URL from the JWT embedded in `TWENTY_API_TOKEN` (claims contain `workspaceId`). Avoids guessing between `app.twenty.com`, `api.twenty.com`, and workspace-subdomain URLs. Override with `TWENTY_BASE_URL` in `.env` if needed.
+
+## How the script stays version-resilient
+
+Introspects the schema first, discovers the actual `Object` / `Field` GraphQL type names, then asks for every scalar/enum that type exposes. New properties added by future Twenty releases get picked up automatically. Curated nested refs (`relationDefinition`, `labelIdentifierFieldMetadata`, ...) are included only when present.
+
+Pagination uses cursor-based `pageInfo.endCursor` so workspaces with >100 objects or >500 fields per object don't get truncated silently.
+
+## How to read `metadata-schema.json`
+
+Each object has:
+
+- `nameSingular` / `namePlural` — API slugs (e.g. `person` / `people`, `company` / `companies`)
+- `labelSingular` / `labelPlural`, `description`, `icon`
+- `isCustom`, `isActive`, `isSystem`, `isRemote`, `isSearchable`, `isUIReadOnly`, `isLabelSyncedWithName`
+- `labelIdentifierFieldMetadata`, `imageIdentifierFieldMetadata` — which field is used as the record's display label / image
+- `fields` — array of every field
+
+Each field has:
+
+- `name` — the slug used in JSON request bodies
+- `type` — `TEXT`, `NUMBER`, `DATE_TIME`, `SELECT`, `MULTI_SELECT`, `RATING`, `RELATION`, `MORPH_RELATION`, `CURRENCY`, `ADDRESS`, `FULL_NAME`, `EMAILS`, `PHONES`, `LINKS`, `UUID`, `RICH_TEXT_V2`, `FILES`, `ACTOR`, `TS_VECTOR`, ...
+- `defaultValue` — JSON value (e.g. `"'DRAFT'"` for a SELECT, `null`, or a structured default for composite types like `FULL_NAME`)
+- `options` — for `SELECT` / `MULTI_SELECT` / `RATING`, the array of `{ value, label, position, color }`
+- `settings` — JSON settings blob (e.g. number precision, dataType)
+- `isNullable`, `isUnique`, `isCustom`, `isSystem`, `isActive`, `isLabelSyncedWithName`
+- `relationDefinition` — for RELATION / MORPH_RELATION fields: `direction`, `sourceObjectMetadata`, `sourceFieldMetadata`, `targetObjectMetadata`, `targetFieldMetadata` (each flattened to identifiers)
+
+Use this when writing n8n HTTP Request node JSON bodies so you know the exact field names and enum values Twenty expects.
+
+## Building API calls
+
+For data operations, hit `https://<workspace>.twenty.com/graphql` (the core GraphQL endpoint) or `/rest/<namePlural>`. For schema / mutation operations (create custom field, create custom object, etc.), hit `/metadata` — `introspection.json` lists every mutation and its input shape.
