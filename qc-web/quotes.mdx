@@ -1,0 +1,92 @@
+---
+title: "Create and Manage QCs (Quotes) in the QC Webapp"
+sidebarTitle: "QCs"
+description: "A QC (Quotation & Costing sheet) belongs to one project. Set the brand, rates, PAX, and dates at creation — all are editable afterwards."
+---
+
+A **QC** (Quotation & Costing sheet) is the main working document in the QC Webapp. It belongs to exactly one project and cannot be moved between projects after creation. Each project can have as many QCs as the deal requires — for example, one per itinerary option or revision.
+
+## Creating a QC
+
+<Steps>
+  <Step title="Open the project">
+    Navigate to the project you want to add a QC to from the home project list.
+  </Step>
+  <Step title="Click New QC">
+    Click **New QC** on the project page. A creation form appears.
+  </Step>
+  <Step title="Choose a brand">
+    Select the brand this quotation will be issued under:
+    - **LUX** — Luxurique
+    - **LXT** — Luxurique Travel
+    - **LBT** — Liberty
+
+    The brand determines which export template is used when you generate a PDF or Word document.
+  </Step>
+  <Step title="Set PAX and dates">
+    Enter the number of travellers (PAX) and the trip start and end dates. These can be left blank and filled in later. PAX and dates are per-QC — different QCs in the same project can have different values.
+  </Step>
+  <Step title="Review the rates">
+    The five rates — **margin**, **commission**, **coordination fee**, **tax**, and **payment fee** — are pre-filled from the system defaults at the moment of creation. You can adjust them now or later (SL+ required to edit rates after creation).
+
+    <Note>
+      Changes to the system defaults never affect existing QCs. Each QC keeps the rates that were in force when it was created. An SL or higher can update individual rates on a QC at any time.
+    </Note>
+  </Step>
+  <Step title="Save the QC">
+    Click **Create**. The app assigns the QC a number within its project (e.g. `-qc1`, `-qc2`) and opens it in the costing editor.
+  </Step>
+</Steps>
+
+## QC fields reference
+
+| Field | Notes |
+|---|---|
+| **QC number** | Auto-assigned within the project (e.g. `-qc1`). Read-only. |
+| **Name** | Free-text display name. You manage this — the system never overwrites it. |
+| **Brand** | LUX / LXT / LBT. Sets the export template. |
+| **Margin** | Rate applied during gross-up. SL+ to edit. |
+| **Commission** | Rate applied during gross-up. SL+ to edit. |
+| **Coordination fee** | Applied to the subtotal after markup. SL+ to edit. |
+| **Tax** | Applied to subtotal + coordination fee. SL+ to edit. |
+| **Payment fee** | Applied to all of the above. SL+ to edit. |
+| **PAX** | Number of travellers. Used for per-person and per-person-per-day totals. |
+| **Start / End date** | Trip dates. Used for per-person-per-day calculation (inclusive trip days). |
+| **Destinations** | Free text describing where the trip goes. |
+| **Description** | Free notes about the QC. |
+| **Active flag** | Controls whether the QC is included in project rollup totals and the CRM push. |
+| **Project Lead override** | Leave blank to inherit the project's Project Lead. Set this when a specific QC has a different lead (e.g. split ownership across two planners). |
+
+## The active flag
+
+The **active flag** on a QC acts as a participation switch for the project's rollup. When active is **on** (the default), the QC's grand total, PAX, and dates are included when calculating the project's combined totals and when pushing to the CRM. When active is **off**, the QC is parked — it remains fully editable but its figures drop out of every rollup.
+
+Use the active flag to park alternative itinerary options or old revisions without deleting them.
+
+<Tip>
+  Toggle the active flag from the QC header. Any editor can do this — it is fully audited and undoable.
+</Tip>
+
+## Project Lead override
+
+By default, a QC inherits the Project Lead set on its parent project. If you need a different lead for a specific QC — for example, when one deal is being costed by two different planners across separate QCs — set the **Project Lead override** field on that QC. Leave it blank to use the project's lead.
+
+## Trashing and deleting a QC
+
+QCs follow the same two-tier deletion process as projects:
+
+| Step | Who can do it | What happens |
+|---|---|---|
+| **Trash** | Any editor of the QC | The QC becomes read-only and moves to the Trash. |
+| **Restore from Trash** | Any editor of the QC | The QC is restored and becomes editable. |
+| **Permanently delete (→ Archive)** | SL+ | The QC moves to the Admin-only archive. Below Admin, this looks permanent. |
+| **Unarchive** | Admin only | The QC is moved back to the Trash. |
+| **Destroy** | Admin only | Permanent. The QC and its contents are destroyed. |
+
+<Warning>
+  If the project containing a QC is trashed, the QC also becomes read-only — even if the QC itself is not trashed. Restore the project to resume editing.
+</Warning>
+
+## Calculation engine versioning
+
+Every QC is pinned to the calculation engine version that was current when it was created. This means a future improvement to the pricing formula will never silently reprice your existing quotes. An SL or higher can explicitly upgrade a QC to the current engine version at any time — this is an audited, undoable operation.

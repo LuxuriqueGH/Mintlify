@@ -1,0 +1,56 @@
+---
+title: "CRM Activity Log: Every Deal Change, Captured Automatically"
+sidebarTitle: "Activity Log"
+description: "Every create, update, and delete in Twenty CRM is automatically captured in Supabase and powers the Preset.io analytics dashboards."
+---
+
+Every time you or an automated workflow creates, updates, or deletes a record in Twenty CRM, that change is captured automatically in the Supabase activity log. You do not need to do anything to trigger this — it runs silently in the background on every CRM operation.
+
+## How it works
+
+When a record changes in Twenty CRM, Twenty sends a webhook to a Supabase edge function. That function verifies the request, checks for duplicates, and appends a new row to the activity log. The log stores a complete snapshot of the record as it was after the change, along with metadata about what fields changed and when.
+
+<CardGroup cols={2}>
+  <Card title="Append-Only" icon="lock">
+    Rows are never edited or deleted. Every change is a new entry, making the log a complete and reliable audit trail.
+  </Card>
+  <Card title="Retained Forever" icon="database">
+    The activity log has no expiry. Every deal history question — when a stage changed, what value was set — can be answered from it.
+  </Card>
+  <Card title="Powers Analytics" icon="chart-line">
+    The Preset.io dashboards read aggregate functions built on top of this log. No log entry means no analytics coverage for that event.
+  </Card>
+  <Card title="Automatic Recovery" icon="rotate">
+    A reconcile process runs every ten minutes to recover any webhook deliveries that were dropped before they reached Supabase.
+  </Card>
+</CardGroup>
+
+## What you interact with
+
+You do not interact with the activity log directly. There is no interface for browsing it or editing it — and no way to delete entries. If you want to review deal history, open the record in Twenty CRM at [luxurique.twenty.com](https://luxurique.twenty.com). The CRM timeline shows the activity sequence for any deal, person, or company.
+
+<Note>
+  The activity log is the source of truth for all analytics. It is append-only by design and enforced at the database level — not just by convention.
+</Note>
+
+## What gets captured
+
+The log covers all object types in Twenty CRM — deals (opportunities), people, companies, and any custom objects. Each entry records:
+
+- The object type and record ID
+- The action (created, updated, or deleted)
+- A full snapshot of the record after the change
+- The names of the fields that changed (but not the before-values)
+- The timestamp of the event
+
+API and automation writes (such as those made by the n8n email triage workflow) are captured exactly the same way as manual edits made in the Twenty UI.
+
+## If a Preset.io dashboard shows a data gap
+
+If you notice that a recent deal change is not reflected in a Preset.io report, it usually means one or more webhook deliveries were dropped before Supabase could record them. This can happen if Supabase was briefly unavailable when Twenty retried the delivery.
+
+<Tip>
+  A backfill run can recover missing events by replaying Twenty's webhook history into the activity log. Contact the engineering team to request a backfill for a specific time range or record type.
+</Tip>
+
+The reconcile process closes most gaps automatically within ten minutes. A manual backfill is only needed when the gap is confirmed to be older than that window.

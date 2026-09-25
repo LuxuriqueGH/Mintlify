@@ -1,0 +1,76 @@
+---
+title: "Create and Manage Projects in the QC Webapp"
+sidebarTitle: "Projects"
+description: "A Project is the top-level container for a deal. Link it to Twenty CRM to pull in client details automatically, or fill in fields by hand."
+---
+
+A **Project** is the top-level container in the QC Webapp — one project per deal. Projects hold all the QCs (quotation and costing sheets) for that deal, along with shared metadata such as the client name, deal name, stage, and Project Lead. Any provisioned user (any role other than None) can create a project.
+
+## Creating a project
+
+<Steps>
+  <Step title="Open the project list">
+    From the home screen, click **New Project**. A creation form appears.
+  </Step>
+  <Step title="Enter the project name">
+    Give the project an on-system name. This name is managed by you and is never overwritten by the CRM.
+  </Step>
+  <Step title="Fill in deal details (or link to Twenty CRM)">
+    You can do either or both:
+
+    - **Manually:** Type the client name, deal name, deal stage, and Project Lead into the form fields.
+    - **Link to a Twenty CRM deal (SL+):** Search for and select the deal. Once linked, the client name, deal name, deal stage, and Sales Lead are pulled from Twenty and become read-only in the app — they can only be changed in the CRM.
+
+    <Tip>
+      You can create a project without a CRM link and link it later. Before linking, all deal fields are free text that you manage yourself.
+    </Tip>
+  </Step>
+  <Step title="Save the project">
+    Click **Create**. The app creates the project, assigns you (the creator) with `scope = all`, and assigns all current Sales Leads with `scope = all` automatically.
+  </Step>
+</Steps>
+
+## Project Lead
+
+The **Project Lead** field identifies the person responsible for the trip. How it works depends on whether the project is linked to a CRM deal:
+
+- **Linked to a deal:** The Project Lead is pulled from Twenty and locked. You cannot edit it here; update it in the CRM and refresh the project.
+- **Not linked (or unlinked):** The Project Lead is a free-text field that you can edit directly on the project page.
+
+<Note>
+  A QC inside the project can set its own **Project Lead override** if the lead differs per QC — for example, where a single deal is split between two planners. Leave the override blank to inherit the project's Project Lead. See [QCs](/qc-web/quotes) for more.
+</Note>
+
+## Linking and unlinking a Twenty CRM deal
+
+Linking a deal is an SL+ action. Once linked:
+
+- The client name, deal name, deal stage, and Sales Lead are pulled from Twenty and shown as read-only.
+- The Project Lead is pulled from the linked deal and locked.
+- The project's CRM-sourced fields are refreshed manually via the **Sync from CRM** button on the project page, or automatically when you open the project.
+
+Unlinking a deal returns all CRM fields to editable free text. The previously pulled values remain as defaults, which you can then edit.
+
+## CRM push
+
+Active QC totals, PAX, and date ranges can be pushed to the linked Twenty opportunity. The push is triggered by publishing a quotation or via the manual **Push to CRM** button on the project page (SL+). Only QCs with their **active flag** turned on contribute to the rollup that gets pushed.
+
+## Trashing and deleting a project
+
+Projects follow a two-tier deletion process to prevent accidental permanent loss:
+
+| Step | Who can do it | What happens |
+|---|---|---|
+| **Trash** | Any user with `scope = all` on the project | The project is soft-deleted. All QCs inside it become **read-only** immediately. The project appears in the Trash. |
+| **Restore from Trash** | Same users who can trash | The project is restored. QCs become editable again. |
+| **Permanently delete (→ Archive)** | Any user with `scope = all` on the project | The project moves to the Admin-only archive. Below Admin, this looks the same as permanent deletion. |
+| **Unarchive** | Admin only | The project is moved back to the Trash, with memberships intact. |
+| **Destroy** | Admin only | Permanent and irreversible. The project and all its QCs are destroyed. |
+
+<Warning>
+  Trashing a project immediately makes every QC inside it read-only. No cost rows can be edited while the project is in the Trash. Restore the project if you need to continue working on a QC.
+</Warning>
+
+<Note>
+  When a project is trashed, its QCs are not listed or actioned separately in the Trash view. They are represented under the project's own Trash entry. Restore the project to restore all its QCs at once.
+</Note>

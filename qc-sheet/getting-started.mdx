@@ -1,0 +1,63 @@
+---
+title: "Get Started with the Luxurique QC Sheet"
+sidebarTitle: "Getting Started"
+description: "Learn how to open the QC Sheet from SharePoint, understand its tab structure, and create your first quote set using the ribbon."
+---
+
+The QC Sheet lives on SharePoint as a single macro-enabled workbook file (`QC-DEV.xlsb`). Everything you need — cost tables, markup rates, quotation staging, and the export pipeline — is contained within that one file. This page walks you through opening the workbook and building your first quote set.
+
+<Steps>
+
+### Open the workbook from SharePoint
+
+Navigate to the shared SharePoint location where `QC-DEV.xlsb` is stored and open it in the **Excel desktop app**. The workbook will not function correctly in Excel for the web — you must use the full desktop client.
+
+When the file opens, Excel may display a security banner asking you to **Enable Content** (macros). Click **Enable Content** to activate the VBA automation that powers the QC Sheet. Without it, the ribbon buttons, row activation, and pricing calculations will not work.
+
+<Warning>
+Never work directly in `QC-DEV.xlsb` if your manager has provided a project-specific copy in the `/beta` folder. Always confirm which file you should be editing before making changes.
+</Warning>
+
+### Understand the tab structure
+
+Once the workbook is open, you will see a set of worksheet tabs along the bottom of the screen:
+
+- **Overview** — the summary dashboard for the entire deal. Totals from all active quote sets roll up here.
+- **Tab 1, Tab 2, …** — individual quote sets. Each tab holds one independent costing scenario for the deal.
+- **DailyView**, **MarkupMaster**, **Tab Details**, and other system sheets round out the workbook.
+
+**Tab 0 is hidden** — it is the master template from which every new quote-set tab is created. You do not interact with it directly.
+
+<Tip>
+The workbook supports a maximum of **30 quote-set tabs** (Tab 1 through Tab 30). Plan your scenarios accordingly before adding tabs — you cannot exceed this limit.
+</Tip>
+
+### Create your first quote set
+
+With the workbook open and macros enabled, use the custom **Luxurique ribbon** to add a new tab:
+
+1. Click the **Luxurique** tab in the Excel ribbon.
+2. Click **Add Tab** (or the equivalent "New Quote Set" button in your ribbon layout).
+3. The workbook creates a new sheet (e.g. "Tab 1") by copying Tab 0, registers it in the system index, and navigates you to it automatically.
+
+Your new quote-set tab contains an empty **MainTable** ready for cost line items, along with formula columns that calculate pricing automatically as you fill in data.
+
+<Note>
+If you click **Add Tab** and nothing appears to happen, wait a moment — there is a brief delay while the system registers the new tab. If the tab still doesn't appear after a few seconds, check that macros are enabled and try again.
+</Note>
+
+### Set the Project ID and Sub ID
+
+Before adding any line items, set the **Project ID** and **Sub ID** for your deal. These identifiers are used to generate unique Item IDs for every cost row you activate.
+
+Look for the **Project ID** and **Sub ID** fields on the **Overview** sheet. If you are unsure what values to use, check with your Project Lead or refer to your company's project registry.
+
+<Warning>
+Line items cannot be activated (the Include checkbox will not generate an Item ID) until both the Project ID and Sub ID are set. Set these before entering any cost data.
+</Warning>
+
+### Start adding cost line items
+
+Navigate to your new Tab 1 sheet. The MainTable is ready — click into the **Item** column and start entering your first cost line item. See [Line Items](/qc-sheet/line-items) for a full guide to all the columns and the Include activation flow.
+
+</Steps>

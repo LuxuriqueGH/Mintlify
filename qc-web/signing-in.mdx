@@ -1,0 +1,54 @@
+---
+title: "Sign In to the QC Webapp with Your Microsoft Account"
+sidebarTitle: "Sign In"
+description: "Sign in to qc.luxurique.com using your Luxurique Microsoft 365 account. New users start with no access and must be granted a role."
+---
+
+The QC Webapp uses your existing Luxurique Microsoft 365 (M365) account for authentication — there is no separate password to remember. When you sign in, the app hands you off to Microsoft's login page and brings you straight back once you've authenticated.
+
+## Signing in for the first time
+
+<Steps>
+  <Step title="Navigate to the app">
+    Open a browser and go to **[qc.luxurique.com](https://qc.luxurique.com)**. You will see the sign-in page.
+  </Step>
+  <Step title="Click Sign In">
+    Click the **Sign In** button. The app redirects you to Microsoft's login page (`login.microsoftonline.com`).
+  </Step>
+  <Step title="Authenticate with your Luxurique account">
+    Enter your Luxurique work email and password. If your organisation has MFA enabled, complete the second factor as usual.
+
+    <Tip>
+      If you are already signed in to Microsoft in the same browser — for example through Outlook or Teams — this step usually completes silently without you needing to type anything.
+    </Tip>
+  </Step>
+  <Step title="Return to the app">
+    Microsoft redirects you back to qc.luxurique.com with an active session. The app never sees your password; Microsoft handles all credential verification.
+  </Step>
+</Steps>
+
+## New user access
+
+When you sign in for the first time, your account is automatically created with a global role of **None**. This means you can authenticate successfully but you will not see any projects or QCs until a Supervisor or Admin grants you a role.
+
+<Note>
+  If you sign in and see an empty dashboard with no projects listed, your account exists but has not been given access yet. Contact a Supervisor or Admin and ask them to assign you a role. See [Roles & Access](/qc-web/roles-and-access) for details on what each role can do.
+</Note>
+
+## Session lifetime and automatic renewal
+
+Once you are signed in, your session stays active for the full working day. The app automatically renews your session in the background using rotating refresh tokens — you will not be logged out mid-session due to a token expiring.
+
+Microsoft is only involved at the moment of sign-in. If there is a Microsoft or Entra ID outage after you have already started your session, your existing session continues without interruption. Only fresh sign-ins (from a new browser or after signing out) would be affected.
+
+<Tip>
+  There is no need to sign in again each morning if you leave a browser tab open. The app keeps your session alive automatically.
+</Tip>
+
+## Signing out
+
+To sign out, open the menu in the top-right corner of the app and select **Sign Out**. This clears your local session. Your data remains intact in the database.
+
+## Access revocation
+
+Your access to the QC Webapp is controlled by your role in the app, not solely by your Microsoft account status. If you leave Luxurique or need to be offboarded from the app immediately, an Admin can set your global role back to **None** — this takes effect on your next request and does not require waiting for a Microsoft session to expire.

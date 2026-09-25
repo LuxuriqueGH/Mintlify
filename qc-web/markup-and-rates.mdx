@@ -1,0 +1,84 @@
+---
+title: "Markup Rates and the Markup Master in the QC Webapp"
+sidebarTitle: "Markup & Rates"
+description: "Understand how markup rates are set, copied into QCs, and updated — including the two rate-edit operations and when each applies."
+---
+
+Every cost line item in a QC passes through a markup step before margin and commission are applied. Markup rates are organised by **Category + Label** combination, managed at two levels: a global seed table (the **Markup Master**) and a per-QC rate table that the app copies from the master when each QC is created. Understanding the relationship between these two levels is key to making rate changes that land in the right places.
+
+## How rates flow from master to QC
+
+<CardGroup cols={2}>
+  <Card title="Markup Master" icon="table">
+    The global default rate table. One rate per Category + Label pair. Only **Supervisor+** users can edit it. Changes here affect only QCs created *after* the edit — no existing QC is ever repriced automatically.
+  </Card>
+  <Card title="QC Rate Table" icon="file-invoice-dollar">
+    Each QC owns its own copy of the rates, stored in the QC's rate table (`quote_label_rate`). This copy is the **sole authority** for pricing rows in that QC. Edits to the Markup Master never reach it after the initial copy.
+  </Card>
+</CardGroup>
+
+When a new QC is created, the app seeds its rate table from the Markup Master. Rates are copied **lazily** — the first time a Category + Label combination is used on a row in that QC, the matching rate is pulled from the master and stored in the QC's own table. From that point on, the QC's rate is independent.
+
+<Note>
+  If you update the Markup Master today, QCs that were created yesterday will not see the change. Only QCs opened or created *after* the update — and that use the affected Category + Label for the first time — will pick up the new rate.
+</Note>
+
+## The per-row markup cache
+
+Each line item stores a **cached copy** of its effective markup rate. This cache is derived from the QC's rate table and is kept in sync automatically. If you change a rate in the QC's own rate table, the cache on affected rows is updated as part of the same operation. You should never need to manage this cache directly — it is an internal detail that makes the grid fast.
+
+A row with an `override_markup` set uses that override instead of the QC rate table. See [Pricing Overrides](/qc-web/pricing-overrides) for details.
+
+## Editing rates in a QC
+
+SL+ users can edit the rates inside a QC (the QC's own rate table). Navigate to the **Rate** panel within the QC and find the Category + Label combination you want to change. When you save a rate edit, the app asks you to choose one of two operations:
+
+<CardGroup cols={2}>
+  <Card title="Update all" icon="rotate">
+    Rewrites the rate in the QC's rate table **and** immediately updates the cached markup rate on every existing row that uses this Category + Label. All matching rows are repriced from the new rate. Use this when you want the change to take effect everywhere right now.
+  </Card>
+  <Card title="Future rows only" icon="arrow-right">
+    Rewrites the rate in the QC's rate table for new rows going forward. Each existing row that currently uses this Category + Label is **pinned to its old rate** via an individual override, so it continues to price as before. Use this when existing costing should be preserved and only new rows should use the new rate.
+  </Card>
+</CardGroup>
+
+<Warning>
+  Both operations leave rows that already carry an **`override_markup`** completely untouched. If a row has been individually overridden, neither "Update all" nor "Future rows only" will change it. You must clear or edit the override directly on that row.
+</Warning>
+
+## Editing the Markup Master
+
+The Markup Master is available under **Admin → Markup Master** and is accessible to **Supervisor+** users only.
+
+<Steps>
+  <Step title="Open the Markup Master">
+    Go to **Admin** in the sidebar, then select **Markup Master**.
+  </Step>
+  <Step title="Locate the Category + Label entry">
+    Browse or search for the combination you want to change. Each row shows the Category, Label, and current default rate.
+  </Step>
+  <Step title="Edit the rate">
+    Click the rate cell and enter the new value. Rates are stored as decimals where **1.0 = 100%**. For example, a 15% markup is entered as `0.15`.
+  </Step>
+  <Step title="Save">
+    Confirm the edit. The change is saved to the master table and will be used the next time this Category + Label is first encountered in a new QC.
+  </Step>
+</Steps>
+
+<Note>
+  Retiring a Category + Label entry (setting it inactive) removes it from the selection list for new rows but preserves it in the master so that existing rows continue to group and report correctly. Do not delete entries — retire them.
+</Note>
+
+## How markup fits into the pricing chain
+
+Markup is one step in a multi-stage calculation that the database engine runs automatically. For reference, the full chain per row is:
+
+1. **Active cost** — the cost value selected by Cost Basis (Estimated, Supplier Quote, or Final Paid).
+2. **Item cost** — Active cost × Qty A × Qty B (null quantities count as 1).
+3. **Markup** — Item cost × (1 + effective markup rate), where the effective rate is the QC rate table value, or the row's `override_markup` if one is set.
+4. **Marked-up item cost** — the result of step 3. Can be replaced directly by `override_marked_up_cost` (SL+).
+5. **Group total** — sum of marked-up item costs for all active rows in the group.
+6. **Unit price** — group total grossed up through margin and commission (each can be skipped per row or group), then rounded up to the nearest ¥100.
+7. **Total price** — unit price × quantities, minus any concession.
+
+You never need to compute any of these values yourself — the database calculates them and the grid displays the results.

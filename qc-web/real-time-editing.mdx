@@ -1,0 +1,67 @@
+---
+title: "Collaborate in Real Time on QC Webapp Quotations"
+sidebarTitle: "Real-Time Editing"
+description: "See colleagues' changes appear within ~1 second and avoid overwrite conflicts with field-level detection and presence badges in the QC Webapp."
+---
+
+The QC Webapp is built for simultaneous co-editing. Any number of team members can have the same QC open at once, and every change a colleague makes appears on your screen within approximately one second — no page refresh required. At the same time, the app protects you and your colleagues from silently overwriting each other's work through a two-tier conflict detection system.
+
+## How live sync works
+
+When you open a QC, the app subscribes to a live channel for that quotation. Whenever a colleague saves a cell edit, inserts or deletes a row, or makes any structural change, the update is pushed to every other open session and applied automatically. You do not need to do anything to receive updates — the grid stays current as long as you are connected.
+
+## Presence badges
+
+<Note>
+  Presence state is maintained server-side and clears automatically when someone closes their browser tab or loses their connection. There are no stale "X is editing" badges left behind after a colleague disconnects.
+</Note>
+
+While a colleague is actively editing a row, a **"[Name] is editing"** badge appears on that row in your grid. The badge disappears as soon as they move away from the row or disconnect. Use these badges as a lightweight signal before you start editing the same area.
+
+## Conflict detection
+
+The QC Webapp uses **field-level conflict detection** for cell edits and **row-level conflict detection** for structural changes. Neither type silently overwrites a colleague's work.
+
+### Cell edit conflicts
+
+When you save a cell edit, the app checks that the field's value on the server still matches what you saw when you started typing. If a colleague saved a different value to the same cell in the meantime, your write is **rejected** and you see a flash notification. Your change is not lost — it remains in the field so you can review what the current value is and decide how to proceed.
+
+### Structural change conflicts
+
+Structural operations — moving rows, inserting, deleting, grouping — use a row-level token (`updated_at`) for conflict detection. If the row was modified by a colleague since you loaded it, your structural change is **rejected** with a notification, and the page reloads to show you the current state of the QC before you try again.
+
+<Warning>
+  Because structural conflict detection is row-level rather than field-level, two people making different structural changes to the same row at the same time will produce a conflict even if those changes touch different aspects of the row. This is by design — structural operations are harder to merge automatically, and a conflict notification is safer than a silent merge.
+</Warning>
+
+## Working effectively with colleagues
+
+<CardGroup cols={2}>
+  <Card title="Cell edits" icon="pen-to-square">
+    You and a colleague can freely edit different cells on the same row simultaneously. Field-level detection keeps each edit independent.
+  </Card>
+  <Card title="Structural changes" icon="arrows-up-down">
+    Moves, inserts, deletes, and group changes require extra coordination. Communicate with colleagues before making them.
+  </Card>
+</CardGroup>
+
+<Tip>
+  Before making structural changes — such as reordering sections, inserting rows, or dissolving a group — let colleagues know via your usual channels (chat, a quick message). A brief heads-up avoids the friction of a conflict reload.
+</Tip>
+
+## What to do after a conflict notification
+
+<Steps>
+  <Step title="Read the notification">
+    The flash notification names the field or operation that conflicted and, where possible, identifies which colleague's change caused it.
+  </Step>
+  <Step title="Review the current value">
+    For cell conflicts, look at what is now shown in the field. For structural conflicts, the page reloads automatically to show the current state.
+  </Step>
+  <Step title="Decide and re-apply if needed">
+    If your intended change is still correct, re-enter it. If a colleague's value takes precedence, leave it as is.
+  </Step>
+  <Step title="Coordinate if the area is contested">
+    If you and a colleague keep conflicting on the same area of a QC, agree on who owns which section or take turns.
+  </Step>
+</Steps>

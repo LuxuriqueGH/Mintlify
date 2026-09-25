@@ -1,0 +1,86 @@
+---
+title: "Undo Changes and Review History in the QC Webapp"
+sidebarTitle: "Undo & History"
+description: "Press Ctrl+Z to undo your last action in a QC, and open the history drawer to review every change made to any row, group, section, or tab."
+---
+
+The QC Webapp gives you two complementary tools for managing changes: **Undo** lets you reverse your most recent action immediately, and **Change History** gives you a full audit trail of every edit ever made to a QC, with the ability to see past states at any level of detail.
+
+## Undo
+
+Press **Ctrl+Z** (Windows / Linux) or **Cmd+Z** (Mac) to undo your last action. Each press reverses one operation. You can continue pressing to work back through your recent edits.
+
+### What you can undo
+
+The following operations are all undoable:
+
+- Cell edits
+- Row inserts and deletes
+- Row moves
+- Paste and clone operations
+- Bulk edits
+- Section and group changes (create, rename, delete)
+
+<Note>
+  **Undo is per-user and per-session.** You can only undo your own actions from your current session. You cannot undo a colleague's edits, and you cannot undo actions from a previous login session.
+</Note>
+
+### Undo is itself recorded in history
+
+When you undo an operation, that undo action appears in the QC's change history just like any other edit. This means the full record of what happened — including corrections — is always preserved.
+
+### Conflict blocks on undo
+
+Because the QC is a live collaborative document, a colleague may have changed the same item since you made your edit. If that happens and you try to undo your action, the undo is **blocked** rather than applied. You will see a toast notification:
+
+> **"Can't undo — [Colleague's name] changed this since."**
+
+This protects your colleague's subsequent work from being silently reversed. To resolve the situation, coordinate with your colleague directly about what the correct value should be and make the change manually.
+
+<Warning>
+  If undoing your action would also reverse a colleague's later edits that depend on your change, the app warns you and spells out what would be wiped before you confirm. Review this carefully before proceeding.
+</Warning>
+
+### Operations that cannot be undone
+
+A small number of operations are permanent and cannot be reversed with Ctrl+Z:
+
+- Hard deletes (archiving or destroying a QC or project from the Trash)
+- Comment actions (create, edit, resolve, delete, redact)
+
+## Change history
+
+Every edit to a QC is automatically recorded with who made it and when. You can view this history at any scope — an individual row, a group, a section, or a tab — without leaving the editor.
+
+### Opening the history drawer
+
+Open the row menu (⋯) on any row, group, section, or tab and select **View history**. The history drawer slides open and shows a chronological list of all changes to that item, including:
+
+- What changed (the field or fields affected)
+- The value before and after the change
+- Who made the change
+- When it was made
+- The operation label (for example, "pasted section 'Day 3' (14 rows)")
+
+<Tip>
+  To see the full history of an entire tab, open the history drawer from the tab itself rather than from individual rows. This gives you a single unified view of all changes across every section and row within that tab.
+</Tip>
+
+### Checkpoints
+
+When a QC is **published**, the app automatically freezes a **checkpoint** — a marker in the history that records the exact state of the QC at the moment it was sent to the client. Checkpoints appear in the history drawer as labelled milestones.
+
+<CardGroup cols={2}>
+  <Card title="What a checkpoint records" icon="flag-checkered">
+    The complete state of the QC — all tabs, sections, groups, rows, and label rates — at the moment of publishing.
+  </Card>
+  <Card title="What a checkpoint does not record" icon="ban">
+    Comments, exports, column layout preferences, and favourites are outside the checkpoint fold.
+  </Card>
+</CardGroup>
+
+Checkpoints let you clearly see what was sent to the client at any point in a QC's history, even after further edits have been made.
+
+### Restoring from history
+
+Any user with edit access to a QC (PL or above) can restore a past state. A restore is itself an audited, undoable operation — it shows up in history like any other change and can be reversed with Ctrl+Z if needed.

@@ -1,0 +1,67 @@
+---
+title: "Luxurique CRM & Integration Stack Overview"
+sidebarTitle: "Introduction"
+description: "Seven connected tools power the Luxurique CRM cluster — from email triage to BI dashboards. Learn what each tool does and how data flows."
+---
+
+Luxurique runs on a cluster of seven integrated tools. At the centre sits **Twenty CRM**, where every client, supplier, and deal record lives. Around it, n8n automates email triage, Supabase captures every record change for analytics, and Preset.io (Superset) surfaces that data as business-intelligence dashboards. Vero handles outbound email marketing, Asana manages project tasks, and SupplierDB was used to migrate supplier records from SharePoint into Twenty. You interact with most of this stack through Twenty CRM and Slack — the automation runs silently in the background.
+
+## The seven tools at a glance
+
+<CardGroup cols={2}>
+  <Card title="Twenty CRM" icon="address-book" href="/crm/twenty-crm">
+    The central hub for all deals, contacts, and companies. Access it at [luxurique.twenty.com](https://luxurique.twenty.com). Every other tool in the cluster reads from or writes to Twenty.
+  </Card>
+  <Card title="Email Triage (n8n)" icon="envelope" href="/crm/email-triage">
+    Inbound emails to the shared inbox are automatically classified, parsed, and turned into CRM records — no manual entry required for most new leads.
+  </Card>
+  <Card title="n8n Workflows" icon="bolt" href="/crm/n8n-workflows">
+    The automation backbone. Reads the M365 proxy inbox, runs LLM-assisted classification and extraction, and writes Person, Company, and Deal records into Twenty CRM.
+  </Card>
+  <Card title="Supabase" icon="database" href="#">
+    Captures every record change in Twenty via webhooks and builds the analytics views that power the BI dashboards.
+  </Card>
+  <Card title="Preset.io / Superset" icon="chart-bar" href="#">
+    The sole BI tool for the cluster. Reads aggregate-only analytics data from Supabase and surfaces deal funnel, stage-transition, and win-rate dashboards.
+  </Card>
+  <Card title="Vero" icon="paper-plane" href="#">
+    Email marketing layer. Sends targeted campaigns based on audience segments derived from Supabase, and writes subscription-state changes back to Twenty person records.
+  </Card>
+  <Card title="Asana" icon="list-check" href="#">
+    Project management integration. Mirrors deal information from Twenty into Asana projects and routes task updates back toward the CRM. Currently in spec stage — not yet live.
+  </Card>
+</CardGroup>
+
+## How data flows through the cluster
+
+Data enters the cluster through two main paths: incoming emails and direct edits in Twenty CRM.
+
+**Email path:**
+1. An email arrives in the Luxurique shared inbox and is copied to the M365 proxy inbox.
+2. **n8n** reads the proxy inbox, classifies the email, and extracts CRM fields (contact name, company, deal details).
+3. n8n writes Person, Company, and Deal records into **Twenty CRM** via GraphQL upsert.
+4. Twenty fires a webhook for every record create or update.
+5. **Supabase** receives those webhooks and appends each change to an immutable activity log, then derives analytics views.
+6. **Preset.io** reads the aggregate analytics from Supabase and updates the dashboards.
+
+**Manual path:**
+Any record created or edited directly in Twenty CRM follows the same webhook → Supabase → Preset chain from step 4 onward.
+
+<Note>
+  You do not need to enter most inbound leads manually. They appear in Twenty CRM within minutes of the email arriving. If a record looks wrong, edit it directly in Twenty — automation will not overwrite your changes.
+</Note>
+
+## Supplier data
+
+Supplier records (companies and contacts) were migrated from SharePoint Lists into Twenty CRM as a one-off project using **SupplierDB**. That migration is complete. New supplier records should be added directly in Twenty CRM.
+
+## What's live and what's coming
+
+| Tool | Status |
+|---|---|
+| Twenty CRM | Live |
+| n8n email triage | Live |
+| Supabase activity capture | Live |
+| Preset.io / Superset dashboards | Live |
+| Vero email marketing | Live |
+| Asana integration | Spec stage — not yet built |

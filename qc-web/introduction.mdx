@@ -1,0 +1,44 @@
+---
+title: "QC Webapp: Browser-Based Quotation and Costing Tool"
+sidebarTitle: "Introduction"
+description: "The QC Webapp is Luxurique's modern replacement for the Excel QC Sheet — collaborative, fully tracked, and accessible from any browser."
+---
+
+The QC Webapp is the official replacement for the Excel-based Quotation and Costing Sheet (QC Sheet). It lives at **[qc.luxurique.com](https://qc.luxurique.com)** and brings your entire costing workflow into a clean browser interface — no more working from per-user Excel copies or losing changes when a workbook freezes.
+
+The app is built on a React front end backed by a Supabase (PostgreSQL) database, with sign-in handled by your existing Luxurique Microsoft 365 account. Every calculation — markup, margin, commission, fees, and grand totals — runs in the database, so the numbers you see are always up to date and consistent for every user viewing the same QC at the same time.
+
+## What's new compared to the Excel sheet
+
+| Capability | Excel QC Sheet | QC Webapp |
+|---|---|---|
+| Simultaneous editing | ❌ One user at a time | ✅ Real-time co-editing with presence badges |
+| Change history | ❌ No audit trail | ✅ Full per-field history, forever |
+| Undo / Redo | ❌ Excel only | ✅ Per-user Ctrl+Z across all operations |
+| Access control | ❌ File-based | ✅ Role- and project-based permissions |
+| CRM integration | Optional n8n proxy | ✅ Direct Twenty CRM link and push |
+| Deployment | Shared file on SharePoint | ✅ Always-on at qc.luxurique.com |
+
+<Note>
+  The QC Webapp is currently in active development. In-flight Excel quotes should be finished in Excel. New deals started from this point forward use the webapp. Your existing Excel workbooks remain archived as files and are not imported into the new system.
+</Note>
+
+## Where to go next
+
+<CardGroup cols={2}>
+  <Card title="Sign In" icon="right-to-bracket" href="/qc-web/signing-in">
+    Sign in with your Luxurique Microsoft 365 account and start a session.
+  </Card>
+  <Card title="Roles & Access" icon="shield-halved" href="/qc-web/roles-and-access">
+    Understand the five roles and how project access is granted.
+  </Card>
+  <Card title="Projects" icon="folder-open" href="/qc-web/projects">
+    Create your first project and link it to a Twenty CRM deal.
+  </Card>
+  <Card title="QCs" icon="file-invoice-dollar" href="/qc-web/quotes">
+    Create a QC inside a project and set up rates and PAX.
+  </Card>
+  <Card title="Tabs, Sections & Groups" icon="table-columns" href="/qc-web/tabs-sections-groups">
+    Structure your costing sheet with tabs, sections, and item groups.
+  </Card>
+</CardGroup>

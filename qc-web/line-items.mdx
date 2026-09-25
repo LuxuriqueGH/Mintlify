@@ -1,0 +1,100 @@
+---
+title: "Add and Edit Cost Line Items in the QC Webapp"
+sidebarTitle: "Line Items"
+description: "Learn how to add, edit, and configure every field on a cost line item — including Cost Basis, quantities, and grouped-row behaviour — in the QC Webapp."
+---
+
+A line item is a single cost entry in a QC — the fundamental unit of costing work. Each row you add to a tab's section represents one service, supplier charge, or expense. Understanding the fields available on a line item, and how the app determines which cost value is active, will help you build accurate quotations quickly.
+
+## Key fields
+
+The table below describes every significant field on a line item. Core columns are visible directly on the grid; supplementary fields (Detail, Supplier, discount, and the full cost-type panel) open in the **row side panel** — click the row-menu icon at the left of any row to open it.
+
+| Field | Description |
+|-------|-------------|
+| **Item** | The name of the cost entry. This is the primary descriptor you see in the grid and in the quotation. |
+| **Date** | The date the service takes place. Displayed in section context on the quotation. |
+| **City** | The location where the item takes place. Informational only. |
+| **Detail** | Additional detail that specifies the resource (e.g. room type, vehicle spec). Visible in the row side panel. |
+| **Category** | The markup category, drawn from the global rate table. Setting a Category and Label together determines the markup rate applied to this row. |
+| **Label** | The sub-classification within the Category. Together with Category it resolves the row's markup rate from the QC's own rate table. |
+| **Cost Basis** | Which of the three stored cost columns is the **active cost** — the value the pricing engine calculates from. Options: `Estimated`, `Supplier Quote`, or `Final Paid`. |
+| **Estimated** | The estimated or indicative cost for this row. Always stored, regardless of which basis is active. |
+| **Supplier Quote** | The cost from a formal supplier quote. Always stored. |
+| **Final Paid** | The amount actually paid. Always stored. |
+| **Qty A** | First quantity multiplier. A null value counts as 1. Must be greater than zero if entered. |
+| **Unit A** | Label for the first quantity (e.g. "nights", "pax"). Informational. |
+| **Qty B** | Second quantity multiplier. A null value counts as 1. Must be greater than zero if entered. |
+| **Unit B** | Label for the second quantity. Informational. |
+| **Supplier** | The supplier name. Stored for reference only — no pricing logic depends on it. |
+| **Active** | Toggle a row on or off. An inactive row is visually marked and excluded from all totals and the quotation, but it is not deleted. |
+
+## How the active cost works
+
+Each line item stores **three separate cost values** — Estimated, Supplier Quote, and Final Paid. Only one is active at a time, determined by the **Cost Basis** field. The other two values remain stored and intact; switching the basis at any point resumes calculating from the newly selected cost column without erasing the others.
+
+<Note>
+  A null active cost counts as zero in every sum, but the row still appears in the grid. A row with no cost entered is valid and will not block you from saving.
+</Note>
+
+The item cost the engine uses is:
+
+> **Active cost × Qty A × Qty B** (null quantities each count as 1)
+
+From there, markup, margin, and commission are applied in sequence to reach the unit price. See [Markup Rates and the Markup Master](/qc-web/markup-and-rates) for details on that chain.
+
+## Grouped rows
+
+When a row belongs to a group, the **group** is the priced unit — not the individual row. Grouped rows contribute their cost to the group total, and the group's markup, quantities, and overrides control the final price. You cannot set a concession, `override_marked_up_cost`, `skip_margin`, or `skip_commission` directly on a grouped row; those controls live on the group.
+
+<Tip>
+  To move a row into or out of a group, use the row menu. If the target group carries a pricing override and the QC's **Protect overrides** setting is on, you will need SL+ access to complete the move. See [Pricing Overrides](/qc-web/pricing-overrides) for details.
+</Tip>
+
+## Editing a cell inline
+
+<Steps>
+  <Step title="Click a cell to enter edit mode">
+    Click any editable cell in the grid. The cell activates and shows an input control.
+  </Step>
+  <Step title="Type your value">
+    Enter the new value. Cost fields accept whole yen amounts only — fractional yen is not supported.
+  </Step>
+  <Step title="Commit the edit">
+    Press **Enter** to commit and move down, or **Tab** to commit and move right. Clicking outside the cell also commits. The change is saved immediately and appears in the row's change history.
+  </Step>
+  <Step title="Open the side panel for supplementary fields">
+    Click the row-menu icon (the open-row icon at the far left) to open the side panel. From here you can set Detail, Supplier, the cost-type selector and all three stored costs, the optional per-unit discount, and any concession on an ungrouped row.
+  </Step>
+</Steps>
+
+<Note>
+  Cell edits use **field-level conflict detection**. If a colleague edits the same cell between the time you opened it and the time you commit, the app will flash a notice and reload the current value. Your typed value is not silently overwritten — you decide whether to re-enter it.
+</Note>
+
+## Adding a row
+
+<Steps>
+  <Step title="Navigate to the target section">
+    Open the tab and locate the section where the new row should appear.
+  </Step>
+  <Step title="Use the quick-add control">
+    Click the **+ Add row** control at the bottom of the section, or use the row menu on an existing row to insert above or below.
+  </Step>
+  <Step title="Fill in the required fields">
+    At minimum, enter an **Item** name. All other fields are optional — an empty cost is valid and calculates as zero until you fill it in.
+  </Step>
+  <Step title="Set the Cost Basis">
+    In the side panel, confirm which cost column should be the active cost. The default is **Estimated**.
+  </Step>
+</Steps>
+
+## Deactivating vs. deleting a row
+
+Toggling the **Active** switch on a row marks it as an inactive placeholder. It stays in the grid (visually dimmed), is excluded from all totals and the quotation, but is **not deleted**. Use this to park a service you are pricing but not yet committing.
+
+Deleting a row removes it outright. Deleted rows do not go to a Trash — they come back only through the **change history** (undo or the row history drawer). If you might need the row again, deactivate rather than delete.
+
+<Warning>
+  Deleting a row that carries a concession is blocked until the concession is removed. Clear the concession first from the row side panel, then delete.
+</Warning>

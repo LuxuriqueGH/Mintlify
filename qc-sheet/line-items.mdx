@@ -1,0 +1,64 @@
+---
+title: "Add and Edit Cost Line Items in the QC Sheet"
+sidebarTitle: "Line Items"
+description: "Every row in a quote-set tab is a cost line item. Learn the key columns, how to activate a row with the Include checkbox, and how to use the Detail field."
+---
+
+Each row in a quote-set tab's cost table is a **cost line item** — one discrete service, product, or expense in your itinerary. You build a quotation by filling in a set of rows, activating them with the **Include** checkbox, and letting the QC Sheet calculate the pricing automatically.
+
+## Key columns
+
+The table below covers the columns you work with most often. Formula and system columns (Item ID, Version, group ordering columns, etc.) are calculated automatically — you do not edit them directly.
+
+| Column | What to enter |
+|---|---|
+| **Item** | A short description of the service or product (e.g. "Airport transfer", "Gala dinner"). |
+| **Date** | The service date. Required before you can activate the row. |
+| **Category** | The cost category that drives markup (e.g. "Accommodation", "Transport"). Drawn from the MarkupMaster rate matrix. |
+| **Label** | The sub-classification within the chosen Category (e.g. "Hotel – 5 Star", "Private Transfer"). The available options update automatically when you set the Category. |
+| **City** | The city or destination where the service takes place. Required for activation. |
+| **Qty A / Unit A** | Primary quantity and its unit (e.g. 2 nights, 1 vehicle). |
+| **Qty B / Unit B** | Secondary quantity and unit where a service has two dimensions (e.g. 10 guests at 1 meal each). |
+| **Estimated Unit Cost** | Your initial cost estimate before supplier confirmation. |
+| **Supplier Quote Unit Cost** | The unit cost as quoted by the supplier. Overrides the estimate in pricing once filled in. |
+| **Final Paid Unit Cost** | The actual amount paid after the service is delivered. Used for reconciliation. |
+| **Status** | The current state of the line item (e.g. confirmed, pending, **Cancelled**). |
+| **Supplier** | The supplier name for this item. |
+| **Detail** | Free-text notes about the item — extra context for the team, not shown on the client quotation. |
+
+<Note>
+You only need to fill in the cost column relevant to your current stage. Use **Estimated Unit Cost** for early planning, **Supplier Quote Unit Cost** once you have a confirmed price from the supplier, and **Final Paid Unit Cost** after payment.
+</Note>
+
+## Activating a row with the Include checkbox
+
+Filling in the columns above does not automatically make a row part of the quotation. To activate a row — which registers it in the system, generates its unique **Item ID**, and includes it in pricing calculations — you tick the **Include** checkbox (column F).
+
+Here is what happens when you tick Include:
+
+1. The QC Sheet validates that the row has the minimum required fields: **Date**, **City**, **Qty**, **Label**, and **Costing Basis**.
+2. If validation passes, a unique **Item ID** is generated for the row in the format `ProjectID-SubID-RandomToken`. This ID is stable and persists for the lifetime of the row.
+3. The row becomes a "1 of 1" group and is incorporated into the table's sort order.
+4. The row contributes to the tab's subtotal and the Overview grand total.
+
+<Warning>
+If you tick Include and nothing happens (no Item ID appears), check that the **Project ID** and **Sub ID** have been set on the Overview sheet, and that all required fields (Date, City, Qty, Label, Costing Basis) are filled in. The row will not activate until all are present.
+</Warning>
+
+To remove a row from the quotation without deleting it, untick the Include checkbox. The row stays in the table but no longer contributes to any totals.
+
+## Cancelled status
+
+Setting a row's **Status** to `Cancelled` has a special effect: the row is automatically moved to a dedicated **Cancelled** section at the bottom of the table. This happens automatically — you do not need to move the row yourself.
+
+Cancelled rows remain visible in the table for record-keeping but are visually separated from active items and do not contribute to the quotation output. The Cancelled section cannot be deleted or reorganised manually.
+
+<Tip>
+Use the Cancelled status rather than deleting a row when you want to keep a paper trail of services that were considered but not included in the final itinerary.
+</Tip>
+
+## The Detail field
+
+The **Detail** column is a free-text field for internal notes. Use it to record anything that helps the team understand the line item: supplier contact notes, special instructions, alternative options considered, or any other context.
+
+Detail text does not appear on the client-facing PDF or Word quotation — it is for internal use only. There is no character limit, but keep entries concise so the table remains easy to scan.

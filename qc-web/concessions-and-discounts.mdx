@@ -1,0 +1,116 @@
+---
+title: "Apply Concessions and Supplier Discounts in the QC Webapp"
+sidebarTitle: "Concessions & Discounts"
+description: "Learn the difference between client-facing concessions and internal supplier discounts, and how to apply each in the QC Webapp."
+---
+
+The QC Webapp provides two separate mechanisms for recording deductions on a cost row or group: **concessions** and **discounts**. They are fundamentally different in purpose and in what they affect. A concession is a deduction you give to the client — it reduces the quoted price and appears in the quotation document. A discount is a supplier break on cost — it affects cost accounting only and is **never shown to the client**. Understanding the distinction prevents pricing errors and keeps client documents accurate.
+
+## Quick comparison
+
+| | Concession | Discount |
+|---|---|---|
+| **Who sets it** | SL+ | Any editor |
+| **Applied to** | Priced unit (ungrouped row or group) | Individual line item row |
+| **Affects** | The quoted price (total price in quotation) | Cost accounting only — not the price |
+| **Visible on quotation** | ✅ Yes — the concession title prints | ❌ No — never appears on client documents |
+| **Modes** | `total` or `per_unit` | `total` or `per_unit` |
+
+---
+
+## Concessions
+
+A concession is a client-visible deduction applied to the **gross line total** of a priced unit — either an ungrouped row or a group. The unit price itself does not change; the concession comes off the total after the full pricing chain has run.
+
+### Setting a concession
+
+<Steps>
+  <Step title="Open the side panel">
+    Click the row-menu icon on an ungrouped row, or the group-menu icon on a group header, to open the side panel.
+  </Step>
+  <Step title="Click 'Add concession'">
+    Find the **Add concession** control in the side panel. This control is only available on priced units — ungrouped rows and groups. It is not available on rows that are members of a group.
+  </Step>
+  <Step title="Enter the amount and choose a mode">
+    Enter the concession amount (in whole yen) and select a mode:
+    - **Total** — a single lump-sum deduction from the line total.
+    - **Per unit** — an amount deducted per unit, multiplied by the line's quantities. Changing quantities later will change the effective deduction; the stored amount itself does not move.
+  </Step>
+  <Step title="Add a concession title">
+    Enter a **Concession title**. This is the client-visible label that prints on the quotation alongside the deduction. Choose wording appropriate for the client to see (e.g. "Group discount", "Complimentary upgrade").
+  </Step>
+  <Step title="Optionally add an internal note">
+    The **Concession note** field is internal only — it never appears on the quotation. Use it to explain the reason for the concession to your colleagues.
+  </Step>
+  <Step title="Save">
+    Save the side panel. The concession is applied immediately and the total price updates in the grid.
+  </Step>
+</Steps>
+
+### Concession modes and caps
+
+The **effective concession** — the amount actually deducted — depends on the mode:
+
+- **Total mode:** the effective concession equals the stored amount.
+- **Per unit mode:** the effective concession equals the stored amount × the priced unit's quantities (Qty A × Qty B, null counts as 1).
+
+<Warning>
+  The effective concession **cannot exceed the gross line total**. An edit that would push the total price below zero is rejected — the app will not trim the concession silently. You must either lower the concession amount or increase the price before saving. Publish is also blocked while a concession is stranded above the gross line total.
+</Warning>
+
+### Concession and grouped rows
+
+A row that carries a concession **cannot be added to a group** until the concession is removed first. Groups are the priced unit, and concessions belong to priced units — a row-level concession and group membership cannot coexist. Remove the concession from the row side panel, then add the row to the group.
+
+---
+
+## Discounts
+
+A discount records a supplier break on the **cost** of an individual line item. It is a cost-accounting entry that tracks the real net cost you are paying — it does not change the price you quote to the client in any way.
+
+<Note>
+  Discounts are cost accounting only. The quoted price still calculates from the row's **active cost** (the full amount before the discount). Reporting surfaces can derive the effective net cost as active cost minus the discount, but the quotation document never shows it.
+</Note>
+
+### Setting a discount
+
+<Steps>
+  <Step title="Open the row side panel">
+    Click the row-menu icon on the line item to open its side panel.
+  </Step>
+  <Step title="Locate the discount section">
+    Find the discount panel within the side panel. This is available on any line item, grouped or ungrouped.
+  </Step>
+  <Step title="Enter the amount and choose a mode">
+    Enter the discount amount (in whole yen) and select a mode:
+    - **Total** — a single lump-sum discount for the entire row.
+    - **Per unit** — an amount per unit, multiplied by the row's quantities.
+  </Step>
+  <Step title="Optionally add an internal note">
+    Use the **Discount note** field to record why the supplier offered the discount. This is internal and never client-visible.
+  </Step>
+  <Step title="Save">
+    Save the side panel. The discount is recorded for cost reporting.
+  </Step>
+</Steps>
+
+### Discount caps
+
+The **effective discount** — the total (or per-unit amount × quantities) — cannot exceed the row's **active cost × quantities**. If a change to the row would indirectly violate this cap (for example, switching to a lower Cost Basis or reducing quantities after a discount is already set), that edit is rejected. You will need to reduce or clear the discount before making the cost or quantity change.
+
+<Warning>
+  A discount requires an active cost. A row with no active cost value cannot carry a discount. Set a cost value first, then add the discount.
+</Warning>
+
+A discount is **static** — it does not automatically adjust when the Cost Basis changes. If you switch from Supplier Quote to Estimated and the estimated cost is lower, the app checks whether the existing discount now violates the cap and rejects the basis switch if it does. Adjust the discount before changing the basis.
+
+---
+
+## Both at once
+
+You can apply both a concession and a discount to the same priced unit:
+
+- The **discount** is on the individual row and records the supplier break (cost accounting).
+- The **concession** is on the priced unit (the ungrouped row, or the group the row belongs to) and reduces the client-facing price.
+
+They operate on different parts of the pricing chain and do not interact with each other.

@@ -1,0 +1,76 @@
+---
+title: "Organise Quotes with Projects and Tabs in the QC Sheet"
+sidebarTitle: "Projects & Tabs"
+description: "One workbook equals one deal. Learn how to create, name, and delete quote-set tabs, and how the Overview and SystemIndex keep everything in sync."
+---
+
+In the QC Sheet, one workbook represents one deal — what the team calls a **QC** (Quotation and Costing file). Within that deal you can maintain up to 30 independent **quote sets**, each on its own worksheet tab. This structure lets you build and compare multiple pricing scenarios for the same client without leaving the file.
+
+## One workbook, one deal
+
+Every time Luxurique takes on a new deal, the team works from a single `QC-DEV.xlsb` workbook (or a project-specific copy of it). All quotes, costing scenarios, and payment tracking for that deal live inside the one file. This keeps pricing consistent, makes it easy to compare scenarios, and ensures the Overview sheet can aggregate totals across all quote sets automatically.
+
+## Quote sets and tabs
+
+Each **quote set** lives on a numbered worksheet tab — Tab 1, Tab 2, and so on, up to a maximum of **Tab 30**. Think of each tab as a self-contained costing scenario: it has its own line items, its own markup settings, and its own quotation output. The tab's underlying data table is called `MainTable1`, `MainTable2`, etc., matching the tab number.
+
+<Note>
+The workbook enforces a hard limit of 30 quote-set tabs. If your deal requires more than 30 scenarios, consider consolidating options or creating a second workbook for overflow scenarios and coordinating with your Project Lead.
+</Note>
+
+## Creating a tab
+
+To add a new quote set, use the **Luxurique ribbon**:
+
+1. Click the **Luxurique** tab in the Excel ribbon.
+2. Click **Add Tab**.
+
+The workbook copies the hidden Tab 0 template to create the new sheet, registers it in the SystemIndex, and navigates you there. The new tab is empty and ready for cost data.
+
+<Tip>
+Name your tabs descriptively as soon as you create them — for example, "Option A – Direct Flight" or "Option B – Charter". Clear names make it much easier to navigate the workbook and to understand the Overview summary at a glance.
+</Tip>
+
+## Naming tabs
+
+You can rename a tab by double-clicking its sheet name at the bottom of the screen and typing a new name, just like any Excel sheet. The QC Sheet watches for renames and updates its internal references automatically. Keep names concise — long names are truncated in the tab bar and can make navigation awkward.
+
+## Deleting a tab
+
+To remove a quote set you no longer need:
+
+1. Navigate to the tab you want to delete.
+2. Use the **Luxurique ribbon** to find the delete or remove option (do not right-click the sheet tab and choose Delete — always use the ribbon button to ensure the SystemIndex is updated correctly).
+3. Confirm the deletion in the dialog that appears.
+
+<Warning>
+Deleting a tab permanently removes all of its cost data, line items, and markup settings. This action cannot be undone. Make sure you have exported or noted anything you need before proceeding.
+</Warning>
+
+## The SystemIndex: the registry of active tabs
+
+Behind the scenes, the QC Sheet maintains a **SystemIndex** — a registry table that records every currently active quote-set tab by name and number. The SystemIndex refreshes automatically as you add or delete tabs.
+
+Several parts of the workbook rely on the SystemIndex to know which tabs to include in calculations:
+
+- The **Overview** sheet reads the SystemIndex to determine which tabs should contribute to the grand total.
+- The **DailyView** sheet reads it to know which MainTables to roll up.
+- Quotation export uses it to build the correct layout.
+
+You do not interact with the SystemIndex directly, but it is worth knowing it exists. If a tab seems to be missing from the Overview totals, it may be because the SystemIndex hasn't refreshed yet — give it a few seconds and the totals should update automatically.
+
+Each tab also has an **Included / Excluded** setting on the Tab Details sheet. Setting a tab to **Excluded** removes it from the Overview totals and the quotation export without deleting it. This is useful when you want to keep a scenario for reference but not include it in the client-facing price.
+
+## The Overview sheet
+
+The **Overview** sheet is the summary dashboard for the entire deal. It shows:
+
+- A roll-up of subtotals from every active, included quote-set tab
+- Grand total pricing figures
+- Payment tracking via the **PaymentTable**
+
+You cannot edit cost data directly on the Overview sheet — it is a read-only summary. All changes must be made on the individual Tab N sheets and the Overview will update accordingly.
+
+<Tip>
+Use the Overview sheet for internal reviews and sign-off discussions. It gives you a clean, consolidated view of the deal's pricing without having to flip between individual tabs.
+</Tip>

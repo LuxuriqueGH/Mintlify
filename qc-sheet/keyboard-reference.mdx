@@ -1,0 +1,82 @@
+---
+title: "QC Sheet Ribbon Reference and Keyboard Shortcuts"
+sidebarTitle: "Ribbon Reference"
+description: "A complete reference for every button in the QC Sheet ribbon, organised by group, with notes on how each action behaves and when to use it."
+---
+
+The QC Sheet adds a dedicated **Costing** tab to the Excel ribbon. All quotation-building actions — from rebuilding the quotation layout to exporting finished deliverables — live here. The sections below describe every control in the order they appear on the ribbon, grouped by function.
+
+## Quotation group
+
+These controls build and export the client-facing quotation. Work through them from left to right: rebuild first, then export.
+
+| Button / Control | Action | Notes |
+|---|---|---|
+| **Update Quotation** | Rebuilds the quotation staging layout from the current costing data | Run this after any change to a costing tab before exporting. The exporters trigger an automatic rebuild if the layout is stale, but running it manually first lets you review the result on-screen. |
+| **Template** *(dropdown)* | Switches the active brand between Luxurique (LUX), Luxurique Travel (LXT), and Liberty (LBT) | The selection is saved to the workbook and persists across sessions. See [Brand Selector](/qc-sheet/brand-selector) for full details. |
+| **Export PDF A4** | Exports the current quotation layout to a PDF at A4 paper size | Saved to your Desktop as `<WorkbookName>_Quotation_A4_<YYMMDD>.pdf`. If the file already exists, a version suffix (`_v2`, `_v3`, …) is added automatically. |
+| **Export PDF A3** | Exports the current quotation layout to a PDF at A3 paper size | Found in the dropdown menu on the Export PDF button. Saved with an `_A3_` label in the filename. Use A3 for wide itinerary tables that overflow A4. |
+| **Export Word** | Generates a `.docx` document from the active brand's embedded Word template | Saved to your Desktop as `<WorkbookName>_Word_<YYMMDD>.docx`. The document is left open in Word for you to review. |
+| **Export XLSX** | Exports a sanitised, formula-free copy of the quotation sheet as a standalone `.xlsx` | Saved to your Desktop as `<WorkbookName>_Quotation_<YYMMDD>.xlsx`. All formulas are converted to values and all macros are removed. Safe to send externally. |
+
+<Note>
+  All four export buttons check whether the quotation layout is current before exporting. If it is stale they trigger a rebuild automatically. If the rebuild fails, the export is cancelled — no partial file is created.
+</Note>
+
+## Tab management group
+
+These controls add and remove quote sets (costing tab + MainTable pairs).
+
+| Button / Control | Action | Notes |
+|---|---|---|
+| **Add Tab** | Creates the next available costing tab (`Tab N`), its MainTable, and its label configuration | Tabs are numbered sequentially. The new tab is ready to use immediately; populate it with cost lines before running **Update Quotation**. |
+| **Delete Quote Set** | Permanently removes a costing tab and its MainTable from the workbook | You must type `DELETE <sheetname>` exactly to confirm. A final audit snapshot of all rows is written to the Audit Log before deletion. This action cannot be undone. |
+
+<Warning>
+  **Delete Quote Set** is irreversible. The tab's data is recorded in the Audit Log, but the sheet itself and its cost lines are gone permanently. Make sure you have exported or saved any outputs you need before deleting.
+</Warning>
+
+## View group
+
+| Button / Control | Action | Notes |
+|---|---|---|
+| **Refresh DailyView** | Rebuilds the DailyView aggregated table from all active costing tabs | DailyView is a read-only roll-up of every cost line across all tabs. Refresh it whenever you want an up-to-date cross-tab view, or after adding or deleting a tab. |
+
+## Keyboard shortcuts
+
+The QC Sheet does not override Excel's standard keyboard shortcuts. All built-in Excel shortcuts work normally.
+
+<CardGroup cols={2}>
+  <Card title="Workbook navigation" icon="keyboard">
+    **Ctrl + Page Down / Page Up** — move between sheets
+
+    **Ctrl + Home** — jump to cell A1
+
+    **Ctrl + End** — jump to the last used cell
+  </Card>
+  <Card title="Selection and editing" icon="table">
+    **Ctrl + Shift + End** — extend selection to last used cell
+
+    **Ctrl + T** — create a new table (avoid on costing tabs)
+
+    **F2** — edit the active cell
+  </Card>
+  <Card title="Undo and save" icon="rotate-left">
+    **Ctrl + Z** — undo the last action
+
+    **Ctrl + S** — save the workbook
+
+    **Ctrl + Shift + S** — Save As
+  </Card>
+  <Card title="Find and filter" icon="magnifying-glass">
+    **Ctrl + F** — Find
+
+    **Ctrl + H** — Find and Replace
+
+    **Alt + Down Arrow** — open a cell's dropdown filter
+  </Card>
+</CardGroup>
+
+<Tip>
+  After clicking **Update Quotation**, the QC Sheet automatically navigates to the rebuilt quotation layout so you can review it before exporting. Press **Ctrl + Home** to return to the top of the sheet, or click any costing tab at the bottom to navigate back.
+</Tip>

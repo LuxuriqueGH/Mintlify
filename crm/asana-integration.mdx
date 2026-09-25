@@ -1,0 +1,50 @@
+---
+title: "Asana Project Management Integration with Twenty CRM"
+sidebarTitle: "Asana Integration"
+description: "The planned Asana integration will auto-create projects from deal stage changes and surface Asana edits as tasks in Twenty CRM — not direct writes."
+---
+
+Luxurique is planning an integration between **Asana** and **Twenty CRM** that will connect project management work to deal activity automatically. When a deal reaches a specified stage in Twenty CRM, the integration will create a corresponding Asana project pre-populated with deal context. A read-only deal mirror will keep the project team informed of the latest CRM state, and any field edits made in Asana will surface as tasks for the Sales Lead or Project Lead to action in Twenty CRM.
+
+<Note>
+  This integration is currently in the planning stage and is not yet active. No Asana projects are being created automatically, and no CRM data is being synced to Asana at this time. This page will be updated when the integration launches.
+</Note>
+
+## Planned capabilities
+
+The following capabilities are under design. Details — including which deal stage triggers project creation, which fields are mirrored, and the technical bridge used — will be confirmed before the integration is built.
+
+<CardGroup cols={2}>
+  <Card title="Auto-create Asana Projects" icon="folder-plus">
+    When a deal reaches a specified stage in Twenty CRM, an Asana project is created automatically and seeded with deal information.
+  </Card>
+  <Card title="Read-Only Deal Mirror" icon="eye">
+    Deal details are continuously synced into the Asana project so the project team always sees current CRM values without needing to open Twenty.
+  </Card>
+  <Card title="Edit-to-Task Loop" icon="list-check">
+    When a Project Lead edits a field in Asana, that edit does not write to Twenty CRM directly. Instead, it creates a task for the Sales Lead to update the source value in Twenty.
+  </Card>
+  <Card title="Twenty Stays the Ledger" icon="shield-check">
+    Asana is a mirror and a task surface. All deal data lives in Twenty CRM. No part of Asana writes to Twenty directly.
+  </Card>
+</CardGroup>
+
+## How edits will flow
+
+The edit-to-task loop is a key design principle of this integration. When a Project Lead notices that deal information in Asana needs updating, they edit the relevant field in Asana. That edit does **not** write to Twenty CRM automatically. Instead, the integration creates a task assigned to the Sales Lead, who then makes the change in Twenty CRM. Once the Sales Lead updates the record in Twenty, the mirror in Asana reflects the new value on the next sync.
+
+This one-way write boundary means Twenty CRM always remains the authoritative record — Asana never overwrites CRM data.
+
+<Tip>
+  If you are a Sales Lead and receive an Asana task requesting a CRM update, make the change on the deal record in Twenty CRM at [luxurique.twenty.com](https://luxurique.twenty.com). The Asana mirror will update automatically after you save.
+</Tip>
+
+## Current status
+
+The Asana integration was added to the Luxurique technical roadmap in September 2026. As of the date of this page, no technical decisions have been finalised — the trigger stage, field mapping, sync frequency, and bridge architecture are all still under review.
+
+<Warning>
+  Do not attempt to configure any Asana-to-CRM connections manually. The integration will be built and tested by the engineering team before it goes live. Manual connections could conflict with the production integration when it launches.
+</Warning>
+
+This page will be updated with setup instructions, field mapping details, and operational guidance when the integration is ready to launch.

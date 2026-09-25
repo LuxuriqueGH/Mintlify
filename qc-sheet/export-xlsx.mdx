@@ -1,0 +1,87 @@
+---
+title: "Export a Sanitised XLSX Quotation from the QC Sheet"
+sidebarTitle: "Export XLSX"
+description: "Export a clean, formula-free .xlsx quotation from the QC Sheet ribbon. No macros, no named ranges — just cell values, logos, and table structure."
+---
+
+The QC Sheet can export the active brand quotation as a standalone `.xlsx` file containing only cell values — no formulas, no macros, no named ranges, and no VBA project. The brand logo and table layout are preserved so the file looks polished, but it carries none of the internal workbook machinery. This makes it safe and straightforward to share with suppliers, third-party operators, or clients who need a readable spreadsheet rather than the full QC workbook.
+
+The exported file opens automatically after saving, so you can review it before distributing it.
+
+## When to use XLSX export
+
+<CardGroup cols={2}>
+  <Card title="Sharing with suppliers" icon="share">
+    Give a supplier a clean cost breakdown without exposing your formulas, markup logic, or internal named ranges.
+  </Card>
+  <Card title="Client-facing spreadsheets" icon="file-spreadsheet">
+    Some clients prefer a spreadsheet they can open and navigate without needing a macro-enabled workbook or a special Excel version.
+  </Card>
+  <Card title="Archiving a point-in-time snapshot" icon="archive">
+    Freeze the current quoted figures as static values. The XLSX captures exactly what the quotation shows at the moment of export, independent of any future data changes in the QC file.
+  </Card>
+  <Card title="Avoiding macro warnings" icon="shield-check">
+    The exported file contains no VBA project, so recipients will not see macro security warnings when they open it.
+  </Card>
+</CardGroup>
+
+## Exporting the XLSX
+
+<Steps>
+  <Step title="Select the active tab">
+    Navigate to the costing tab that corresponds to the quotation you want to export. The export rebuilds from the active MainTable if the staging is stale.
+  </Step>
+  <Step title="Choose the brand template">
+    In the ribbon's **Quotation** group, open the **Template** dropdown and confirm the correct brand is selected — **LUX** (Luxurique), **LXT** (Luxurique Travel), or **LBT** (Liberty). The XLSX is generated from that brand's quotation sheet.
+  </Step>
+  <Step title="Click Export XLSX">
+    Click **Export XLSX** on the ribbon. The workbook will:
+    1. Check whether the quotation staging is current and rebuild if needed.
+    2. Force a full recalculation so all cached values are up to date.
+    3. Copy the active quotation sheet to a new, single-sheet workbook.
+    4. Replace every formula with its current calculated value.
+    5. Remove all named ranges and the internal Item ID column (column A).
+    6. Save the file as `.xlsx` to your Desktop, stripping VBA in the process.
+    7. Open the sanitised file for your review.
+  </Step>
+  <Step title="Review and distribute">
+    The exported `.xlsx` opens automatically. Confirm the figures, layout, and logo look correct before sharing the file.
+  </Step>
+</Steps>
+
+## Output file name and versioning
+
+The file is saved to your Desktop with a name based on the workbook filename and today's date:
+
+```
+<WorkbookName>_Quotation_YYMMDD.xlsx
+```
+
+If a file with that name already exists, the export appends a version suffix:
+
+```
+<WorkbookName>_Quotation_YYMMDD_v2.xlsx
+<WorkbookName>_Quotation_YYMMDD_v3.xlsx
+```
+
+<Note>
+The Desktop path is resolved correctly even when your Desktop is redirected to OneDrive.
+</Note>
+
+## What the XLSX contains — and what it does not
+
+| Preserved | Removed |
+|---|---|
+| All cell values (frozen at export time) | All formulas |
+| Brand logo and other images | All named ranges |
+| Table layout and formatting | Column A (internal Item ID column) |
+| Row heights and column widths | All VBA macros |
+| | Workbook links and external references |
+
+<Warning>
+Because all formulas are replaced with static values, the exported XLSX will not update if you later change data in the QC file. If you need a refreshed copy, run the export again — a new versioned file will be created automatically.
+</Warning>
+
+<Tip>
+If you export multiple versions in the same day, the versioning suffix (_v2, _v3, …) keeps every copy on your Desktop without overwriting earlier ones. Periodically clear old exports from your Desktop to keep things tidy.
+</Tip>

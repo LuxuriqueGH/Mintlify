@@ -1,0 +1,95 @@
+---
+title: "Tabs, Sections, and Groups in the QC Webapp"
+sidebarTitle: "Tabs, Sections & Groups"
+description: "QCs are structured into Tabs, Sections, and Groups. Understand how each layer works to cost and present your itinerary clearly."
+---
+
+Every QC is organised into three structural layers: **Tabs** at the top, **Sections** within each tab, and optionally **Groups** within each section. Understanding how these layers fit together helps you cost efficiently and produce clean client-facing quotations.
+
+## Tabs
+
+A **Tab** is the top-level container inside a QC. Tabs are freeform — you can have as many as your itinerary needs, with no cap. Think of each tab as a page or day-block in your costing workbook.
+
+When you create a new tab, the app automatically creates one default section inside it so you can start adding rows immediately.
+
+### Default category
+
+Each tab has a **default category** setting. When you add a new cost row to the tab, the category field is pre-filled with the tab's default category, saving you from typing it repeatedly. You can override the category on any individual row at any time.
+
+### Parking a tab
+
+You can **park** a tab by toggling its active flag off. A parked tab is excluded from all totals and does not appear in the quotation output. Use this to sideline a whole block of the itinerary without deleting it.
+
+<Tip>
+  Parked tabs are still fully visible in the editor — only their contribution to totals and to the client-facing quotation is suppressed. This makes them useful for holding cost research or alternative options alongside the live itinerary.
+</Tip>
+
+## Sections
+
+A **Section** sits inside a tab and acts as a labelled heading in your costing sheet. Sections are visible to the client in the quotation output, so their titles should be presentation-ready (for example, "Day 1 — Tokyo Arrival" or "Nov 02–07 Kyoto").
+
+Each section has:
+- A **title** (required) — shown as a heading on the quotation.
+- An optional **date** — a single date for the section (e.g. the date of a day's activities).
+- An optional **end date** — when a section spans a range of dates (e.g. "Nov 02–07"), set both a start and end date to display the range on the quotation.
+
+Sections that contain no active rows are automatically hidden from the quotation output — they remain in the editor but do not appear to the client.
+
+## Groups
+
+A **Group** is the priced unit inside a section. When you bring multiple cost rows together into a group, the group as a whole becomes what's priced and presented to the client — the individual rows that make up the group are your internal costing detail, not separate line items in the quotation.
+
+### Why use groups?
+
+Use a group when several cost components (hotel, transfer, guide, activity) combine into a single client-facing service or package. The group carries a **title** (the client-visible name), optional detail text, and its own quantities (Qty A × Qty B). The group cost is the sum of its members' marked-up costs, grossed up to a single unit price.
+
+### Ungrouped rows
+
+Cost rows that are not assigned to a group are **standalone priced units** — each row carries its own price and appears as its own line in the quotation. Use ungrouped rows for simple, single-supplier items that don't need to be bundled.
+
+### Group active flag
+
+A group has its own **active flag**. Turning a group off excludes it and all its member rows from every calculation and from the quotation, without deleting anything.
+
+## How the layers fit together
+
+```
+QC
+└── Tab  (freeform container; default category; active flag)
+    └── Section  (client-visible heading; optional date / date range)
+        ├── Ungrouped row  (standalone priced unit)
+        └── Group  (titled priced unit; Qty A × Qty B)
+            ├── Cost row
+            ├── Cost row
+            └── Cost row
+```
+
+The ordering within a section is shared between ungrouped rows and groups — you can interleave them freely. Each group occupies a single slot in the section's order and moves as a whole unit when you reorder.
+
+<Note>
+  Rows, groups, and sections inside a QC do not have their own Trash. Deleting them removes them immediately — but the full change is recorded in the QC's history, so you can always recover a deleted row, group, or section via the history panel.
+</Note>
+
+## Adding and managing structure
+
+<Steps>
+  <Step title="Add a tab">
+    Click **+ Tab** in the tab strip at the top of the QC editor. Give the tab a name. A default section is created automatically inside it.
+  </Step>
+  <Step title="Add a section">
+    Within a tab, click **+ Section**. Enter a title and, optionally, a date or date range.
+  </Step>
+  <Step title="Add rows">
+    Click **+ Row** inside a section to add a cost row. If the tab has a default category set, the category field is pre-filled.
+  </Step>
+  <Step title="Create a group">
+    Select two or more rows in a section and choose **Group selected rows** from the row menu, or click **+ Group** to create an empty group and add rows into it. Give the group a title — this is the text your client will see on the quotation.
+  </Step>
+  <Step title="Set the default category on a tab">
+    Open the tab settings (the ⋯ menu on the tab) and set the **Default category**. All new rows added to that tab will inherit it automatically.
+  </Step>
+</Steps>
+
+<Warning>
+  A cost row that carries a concession (a client-facing deduction) cannot be moved into a group until the concession is removed. Once inside a group, concessions belong to the group, not to individual rows.
+</Warning>

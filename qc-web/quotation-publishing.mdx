@@ -1,0 +1,77 @@
+---
+title: "Publish a Quotation to a Client in the QC Webapp"
+sidebarTitle: "Publishing"
+description: "Learn what publishing a QC means, who can do it, the pre-publish checks the app runs, and what happens to the quotation record after publishing."
+---
+
+Publishing is the formal step that marks a quotation as sent to the client. It is distinct from simply viewing or exporting a draft — a published quotation is an immutable, permanent record that the system treats as the official version for that moment in time. Understanding what happens during publishing helps you use it confidently and avoid mistakes that require creating a fresh export.
+
+## Who can publish
+
+Only users with the **Sales Lead (SL), Supervisor, or Admin** role can publish a quotation. If you hold a Project Lead (PL) role, you can prepare the QC and generate draft exports for review, but you will need to hand off to an SL or above to publish.
+
+<Note>
+  If you attempt to publish without the required role, the publish button will be unavailable or the action will be blocked with a permissions message.
+</Note>
+
+## Pre-publish checks
+
+Before the system completes a publish, it runs a set of automatic checks. If any check fails, publishing is blocked and you are shown what needs to be resolved.
+
+### Concession validation
+
+Every **concession** on the QC is re-checked at publish time. A concession is considered **stranded** if its value exceeds the gross line total of the priced unit it belongs to (that is, the concession would push the line's total price below zero). Publishing is **rejected** while any stranded concession exists.
+
+<Steps>
+  <Step title="Find the flagged line">
+    The publish error message identifies which priced unit (group or ungrouped row) has the stranded concession.
+  </Step>
+  <Step title="Resolve the concession">
+    Either reduce the concession amount so it no longer exceeds the gross line total, or remove the concession entirely if it is no longer applicable. This requires SL+ access.
+  </Step>
+  <Step title="Retry publishing">
+    Once all concessions are within bounds, attempt to publish again.
+  </Step>
+</Steps>
+
+### Trashed QC or project check
+
+You **cannot publish a QC that is in the Trash**, and you cannot publish a QC whose parent project is in the Trash. Restore the QC or the project first, then publish.
+
+## What publishing does
+
+When a publish succeeds, the following happens in a single, all-or-nothing operation:
+
+<CardGroup cols={2}>
+  <Card title="Checkpoint frozen" icon="flag-checkered">
+    The current state of the QC — all tabs, sections, groups, rows, and label rates — is captured as an immutable checkpoint in the change history.
+  </Card>
+  <Card title="PDF stored" icon="file-pdf">
+    The rendered quotation PDF is saved to secure storage. The column layout in force at publish time is frozen with it.
+  </Card>
+  <Card title="Export record created" icon="list-check">
+    A published export entry is added to the QC's export history, showing who published it, when, and the paper size used.
+  </Card>
+  <Card title="CRM push triggered" icon="arrow-up-right-from-square">
+    The QC's financial totals are pushed to the linked CRM opportunity, if one is linked to the project.
+  </Card>
+</CardGroup>
+
+## Published exports are immutable
+
+<Warning>
+  A published export **cannot be overwritten or deleted**. If the quotation needs to change after publishing — for example, to correct a cost or update pricing — make your edits to the QC and create a **new** published export. Both the original and the updated version remain in the export history, providing a clear record of what was sent to the client at each point in time.
+</Warning>
+
+## Viewing published exports
+
+All published exports for a QC are listed in the **export history** panel, visible to anyone with access to the QC. Each entry shows:
+
+- The date and time of publishing
+- Who published it
+- The paper size used
+- A download link for the stored PDF
+
+<Tip>
+  Use the export history to confirm whether a quotation has already been sent to a client and to retrieve the exact PDF that was shared with them — useful when a client refers to an older version of the quote.
+</Tip>

@@ -1,0 +1,58 @@
+---
+title: "Choose a Brand for Your Quotation in the QC Sheet"
+sidebarTitle: "Brand Selector"
+description: "Switch between Luxurique, Luxurique Travel, and Liberty brands to control the quotation layout, Word template, and disclaimer page used for each export."
+---
+
+The QC Sheet supports three client-facing brands, each with its own quotation layout, embedded Word template, and PDF disclaimer page. Before you build or export a quotation, confirm that the correct brand is selected — the brand controls every output the QC Sheet produces, from the on-screen staging layout right through to the printed disclaimer.
+
+## The three brands
+
+<CardGroup cols={3}>
+  <Card title="Luxurique (LUX)" icon="star">
+    The flagship brand. Uses the `QuotationLUX` sheet layout, the LUX Word template, and the `QTERMS_LUX` disclaimer page.
+  </Card>
+  <Card title="Luxurique Travel (LXT)" icon="plane">
+    Shares the LUX sheet layout and Word template. Has its own distinct disclaimer page (`QTERMS_LXT`), so your PDF footer content differs from LUX even though the table layout is identical.
+  </Card>
+  <Card title="Liberty (LBT)" icon="shield">
+    Fully independent layout. Uses the `QuotationLBT` sheet, its own Word template, and the `QTERMS_LBT` disclaimer page.
+  </Card>
+</CardGroup>
+
+## Selecting a brand
+
+1. Open the **Quotation** ribbon group (the **Costing** tab in the Excel ribbon).
+2. Click the **Template** dropdown.
+3. Select **Luxurique**, **Luxurique Travel**, or **Liberty**.
+
+The QC Sheet saves your selection immediately to the workbook's document properties, so the chosen brand persists the next time you open the file — even across VBA resets.
+
+<Tip>
+  You can confirm the active brand at any time by glancing at the **Template** dropdown; it always reflects the currently saved selection.
+</Tip>
+
+## How brand affects each export type
+
+| Export | What the brand controls |
+|---|---|
+| **Update Quotation** | Which sheet layout is rebuilt (`QuotationLUX`, `QuotationLXT`, or `QuotationLBT`) |
+| **Export PDF (A4 / A3)** | Which rebuilt layout is printed, including its disclaimer page |
+| **Export Word** | Which embedded Word template (`.docx`) is extracted and populated |
+| **Export XLSX** | Which quotation sheet is copied into the sanitised workbook |
+
+## LXT and LUX layout sharing
+
+Luxurique Travel uses the same table layout templates as Luxurique — the same header block and the same per-section quote table prototype. The difference between the two brands is entirely in the disclaimer: LXT has its own dedicated disclaimer page that is separate from, and never combined with, the LUX disclaimer.
+
+<Note>
+  If you switch brands after running **Update Quotation**, run **Update Quotation** again before exporting. The rebuild targets the active brand's sheet; an export triggered without a fresh rebuild for the new brand will rebuild automatically, but triggering it manually first lets you review the layout before committing to a PDF or Word file.
+</Note>
+
+## Brand and the disclaimer page
+
+Each brand's disclaimer is defined by a named range on the Templates sheet (`QTERMS_LUX`, `QTERMS_LXT`, or `QTERMS_LBT`). When you run **Update Quotation**, the rebuild appends only the disclaimer for the active brand — it always starts on a new printed page. If a brand's disclaimer range is absent from the workbook, that brand's output simply has no disclaimer page; no error is raised.
+
+<Warning>
+  Do not rename or delete the `QTERMS_*` named ranges on the Templates sheet. The rebuild looks them up by name, and a missing range means the disclaimer is silently omitted from every PDF and Word export for that brand.
+</Warning>

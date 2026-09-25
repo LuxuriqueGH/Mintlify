@@ -1,0 +1,97 @@
+---
+title: "Manage Deals and Contacts in Twenty CRM"
+sidebarTitle: "Twenty CRM"
+description: "Twenty CRM is the Luxurique hub for all deals, contacts, and companies. Access it at luxurique.twenty.com and manage your pipeline from one place."
+---
+
+Twenty CRM is the central record of truth for every Luxurique deal, client, and company. Every tool in the cluster — n8n automation, Supabase analytics, Preset.io dashboards, Vero email marketing — either reads from or writes to Twenty. You access it at [luxurique.twenty.com](https://luxurique.twenty.com).
+
+## Core record types
+
+Twenty organises your data into three main record types.
+
+**People** — individual contacts: clients, agents, suppliers, and other contacts associated with a deal or company.
+
+**Companies** — organisations: client companies, travel agencies, DMCs, hotels, and other suppliers.
+
+**Deals** — active and historical deal records. In the Twenty interface these appear as **Deals**; in the underlying API they are called **Opportunities** (`opportunity`). You will see the API name referenced in some automation and integration contexts, but in the CRM UI you always work with Deals.
+
+<Note>
+  The Twenty API name for a deal is `opportunity`. If you ever see that term in a Slack notification, n8n log, or technical note, it refers to the same deal record you see in the CRM.
+</Note>
+
+## Navigating to a record
+
+Every record in Twenty has a direct link in the format:
+
+```
+https://luxurique.twenty.com/object/<type>/<recordId>
+```
+
+For example, a direct link to a Person record might look like:
+`https://luxurique.twenty.com/object/person/abc123`
+
+You can share these links with colleagues to point them directly to a specific deal or contact.
+
+## Linking a QC project to a deal
+
+The Quotation Costing (QC) Webapp can pull client and deal information directly from Twenty, and push costing results back — eliminating double-entry between the two tools.
+
+<Steps>
+  <Step title="Open the project in the QC Webapp">
+    Navigate to your project in the QC Webapp.
+  </Step>
+  <Step title="Link the project to a Twenty deal">
+    Use the deal-link field in the QC Webapp to connect the project to the corresponding Twenty Deal record.
+  </Step>
+  <Step title="Review the pulled fields">
+    Once linked, the QC Webapp automatically pulls in the following from Twenty:
+    - **Client name**
+    - **Deal name**
+    - **Deal stage**
+    - **Sales Lead**
+  </Step>
+  <Step title="Export the quotation">
+    When you export the completed quotation, the QC Webapp pushes the following values back to the linked deal in Twenty:
+    - **Grand total** (`GRANDTOTAL`)
+    - **Gross cost**
+    - **PAX** (passenger count)
+    - **Travel dates**
+  </Step>
+</Steps>
+
+<Tip>
+  Linking a QC project to a deal saves time and keeps your CRM data current without manual updates. Make a habit of linking early — before you start costing — so the deal fields are always available in the QC Webapp.
+</Tip>
+
+## How deals get created and updated
+
+Deals in Twenty come from two sources:
+
+- **Automated (n8n):** When a business inquiry arrives in the shared inbox, n8n classifies it, extracts the relevant CRM fields, and creates a Person, Company, and Deal in Twenty automatically. The deal usually appears within a few minutes of the email arriving.
+- **Manual:** You can create or edit any record directly in Twenty CRM at any time.
+
+<Warning>
+  The n8n automation is **create-only** — it creates new records but never overwrites values you have edited manually. Once you update a field in Twenty, that field is yours to manage. Automation will not touch it.
+</Warning>
+
+## Editing and correcting records
+
+If an automatically created record is missing information, misclassified, or linked to the wrong company:
+
+1. Open the record in Twenty CRM.
+2. Edit the fields you need to correct.
+3. Save. Your changes are permanent and will not be overwritten by automation.
+
+<Note>
+  If a contact is missing entirely — for example, a client who emailed from a personal Gmail address — you can create them manually in Twenty. See the [Email Triage](/crm/email-triage) page for known gaps in automatic contact creation.
+</Note>
+
+## Company and person types
+
+Twenty uses a **Type** field on both Companies and People to indicate their role in a deal:
+
+- **CLIENT** — the end customer for whom the trip is arranged.
+- **AGENCY** — a travel intermediary (travel agency, DMC, incentive house) that is arranging the trip on behalf of a client.
+
+A record can hold more than one type. Types are assigned at creation from the first email that creates the record. If a record's type is wrong, update it directly in Twenty.

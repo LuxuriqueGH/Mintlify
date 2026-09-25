@@ -1,0 +1,63 @@
+---
+title: "Track Changes with the QC Sheet Audit Log"
+sidebarTitle: "Audit Log"
+description: "The AuditLog sheet records a full row snapshot every time a MainTable entry is updated, giving you a permanent, traceable history of every cost item."
+---
+
+Every time you update a row in a costing tab, the QC Sheet writes a complete snapshot of that row to the **AuditLog** sheet. Unlike a simple change log, each entry captures the full state of the row at the moment of the edit — every column, not just the column you changed. This means you can reconstruct exactly what a cost item looked like at any point in its history.
+
+## Where to find the Audit Log
+
+Navigate to the **AuditLog** sheet in the workbook. All entries are stored in a single Excel table named **tAuditLog**. Rows are always appended at the bottom; nothing is ever deleted or overwritten.
+
+## Audit Log columns
+
+The table begins with four metadata columns, followed by a complete copy of all MainTable columns in their original order.
+
+| Column | What it contains |
+|---|---|
+| **AuditTimestamp** | The date and time the snapshot was taken |
+| **SourceSheet** | The name of the tab where the edit was made (e.g. `Tab 3`) |
+| **SourceTable** | The ListObject name of the costing table (e.g. `MainTable3`) |
+| **SourceRow** | The row index within the source table's data body (1-indexed) |
+| *(All MainTable columns)* | A verbatim copy of every column in the row at the time of the edit |
+
+## What triggers an audit entry
+
+An audit entry is written whenever you click the **Update Entry** button in the ribbon while one or more rows in a costing tab are selected. The system processes your selection and appends one snapshot row to **tAuditLog** for each affected MainTable row.
+
+<Note>
+  Editing a cell directly does **not** automatically create an audit entry. You must click **Update Entry** after making your changes to record a snapshot. Formulae that recalculate in the background are not audited.
+</Note>
+
+## Grouped rows are audited together
+
+When rows share a **GroupID**, updating any one of them causes the entire group to be snapshotted together and given the same new version number. This keeps the audit history consistent — you will always see a complete group snapshot, never a partial one.
+
+**Example:** If three rows share GroupID `A1B2C3`, clicking **Update Entry** on any one of them writes three new rows to **tAuditLog**, one per group member, all with the same `AuditTimestamp` and incremented `Ver` value.
+
+## Using the Version (Ver) column
+
+Each MainTable row carries a **Ver** column that increments by one every time **Update Entry** is run on that row (or its group). You can use `Ver` together with `SourceRow` to filter the AuditLog and see the full edit sequence for a single cost item over time.
+
+<Tip>
+  To trace the history of a specific item, filter **tAuditLog** by `SourceTable` and `SourceRow`. Sort by `AuditTimestamp` ascending to read the changes chronologically. The `Ver` column confirms no snapshots are missing.
+</Tip>
+
+## Audit entries on tab deletion
+
+When a quote set (Tab) is deleted, the system automatically writes a final audit snapshot for every row in that tab's MainTable before removing the sheet. This means the Audit Log retains a record of the tab's contents even after the tab itself is gone.
+
+## Audit Log retention
+
+The Audit Log grows indefinitely — entries are never purged automatically. Over time, on large projects with many edits, the table can become sizeable.
+
+<Warning>
+  Do not delete rows from **tAuditLog** manually. The table is append-only by design. If you need to archive older entries, copy them to a separate workbook and keep the originals in place.
+</Warning>
+
+## Limitations
+
+- **Formula results are not audited.** Only the values present in the row at the time you click **Update Entry** are snapshotted. If a formula recalculates after the snapshot, the audit entry will not reflect that recalculation.
+- **One MainTable per click.** If your selection spans more than one costing tab, only the first MainTable in the selection is processed.
+- **Schema is fixed after first use.** The column structure of **tAuditLog** is set the first time **Update Entry** runs. Adding or removing columns from a MainTable after that point will produce inconsistent snapshots.

@@ -1,0 +1,56 @@
+---
+title: "Sales Analytics and Pipeline Reporting in Preset.io"
+sidebarTitle: "Superset Dashboards"
+description: "View deal pipeline, stage transitions, win rates, and funnel analytics in Preset.io — Luxurique's hosted Apache Superset BI workspace."
+---
+
+Luxurique uses **Preset.io** — a hosted, managed version of Apache Superset — as its sole business intelligence tool. Preset.io connects to a dedicated analytics schema in Supabase and gives you aggregate reporting across the entire deal pipeline. You access Preset.io through the Luxurique Preset workspace. If you do not yet have access, contact a Supervisor to request it.
+
+## What the dashboards show
+
+The Preset.io dashboards draw from aggregate analytics functions built on top of the Supabase activity log. Every chart reflects live CRM activity as Twenty records are created and updated.
+
+<CardGroup cols={2}>
+  <Card title="Deal Pipeline" icon="chart-bar">
+    A real-time view of deals grouped by stage and deal type (MICE / FIT) or brand (LUXURIQUE / LIBERTY).
+  </Card>
+  <Card title="Stage Transitions" icon="arrows-left-right">
+    How deals move between stages over time, including flow volume per transition pair.
+  </Card>
+  <Card title="Dwell Time" icon="clock">
+    How long deals spend at each stage, surfaced as a statistical distribution rather than a simple average.
+  </Card>
+  <Card title="Win Rates" icon="trophy">
+    The percentage of deals that reach each stage and ultimately close as won, conditioned on the stage they entered.
+  </Card>
+</CardGroup>
+
+## What you can and cannot see
+
+Preset.io connects to Supabase using a read-only, least-privilege login (`preset_ro`). That login can only call aggregate-only functions in the `analytics` schema — it physically cannot read per-deal rows, individual deal names, margins, or costs. You will always see summary numbers, never raw CRM records.
+
+<Note>
+  Individual deal margins, contract amounts, and cost data are **not** exposed in Preset.io. If you need deal-level figures, open the record directly in Twenty CRM at [luxurique.twenty.com](https://luxurique.twenty.com).
+</Note>
+
+## How the data stays current
+
+Every create, update, or delete in Twenty CRM fires a webhook that Supabase captures in an append-only activity log. The Preset.io dashboards read aggregate functions that sit on top of that log. There is no manual refresh step — data flows through automatically as CRM activity happens.
+
+A background reconcile process also runs every ten minutes to recover any webhooks that were dropped before they could be recorded. This means the dashboards remain accurate even under transient delivery failures.
+
+## Getting access
+
+<Tip>
+  Access to the Luxurique Preset workspace is provisioned by a Supervisor. Send your request with your Luxurique email address and the Supervisor will add you to the workspace.
+</Tip>
+
+Once you have access, navigate to the Luxurique Preset workspace in your browser and sign in. All published dashboards are available from the **Dashboards** menu.
+
+## Reporting a data gap
+
+If a chart appears to be missing recent data or a deal you know exists does not appear in a report, it is possible that one or more webhook deliveries were dropped before the reconcile process could recover them. In that case, a manual backfill can be requested from the engineering team to replay Twenty's event history and fill the gap.
+
+<Warning>
+  Do not attempt to edit data in Preset.io directly. All source data lives in Twenty CRM. Changes made only in a dashboard tool will be overwritten the next time the underlying data refreshes.
+</Warning>

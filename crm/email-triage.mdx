@@ -1,0 +1,82 @@
+---
+title: "Automated Email Triage and CRM Capture in Luxurique"
+sidebarTitle: "Email Triage"
+description: "Inbound emails to the Luxurique shared inbox are automatically classified and written to Twenty CRM by n8n — no manual entry needed for most new leads."
+---
+
+Every email that arrives in the Luxurique shared inbox is automatically processed. You do not need to manually enter most new leads — they appear in Twenty CRM as Person, Company, and Deal records within minutes of the email landing in the inbox.
+
+## What happens to each email
+
+The moment an email arrives, n8n reads it from a dedicated M365 proxy inbox (a copy of the shared inbox set up for automation, so the automation never touches your live inbox). n8n then:
+
+1. **Classifies** the email into one of four categories: **inquiry**, **supplier**, **junk**, or **uncertain**.
+2. **Extracts CRM fields** from genuine business inquiries — contact name, email, company, deal details, destinations, travel dates, and passenger count.
+3. **Creates or updates records** in Twenty CRM — one Person record per identified contact, one Company record, and one Deal.
+4. **Sends a Slack notification** to the `#sales-new-deals` channel when a new deal is created, and to `#pipeline-alerts` for uncertain emails that need human review.
+
+<Note>
+  Only emails classified as **inquiry** result in CRM records. Supplier pitches, junk mail, and newsletters are filed automatically without creating any records in Twenty.
+</Note>
+
+## The four triage categories
+
+| Category | What it means | CRM action |
+|---|---|---|
+| **Inquiry** | A genuine prospect or customer reaching out about a trip | Person, Company, and Deal created in Twenty |
+| **Supplier** | A hotel, DMC, OTA, recruiter, or other party pitching services to Luxurique | Filed to folder — no CRM records created |
+| **Junk** | Spam, newsletters, automated notices | Filed to folder — no CRM records created |
+| **Uncertain** | Genuinely ambiguous — could be an inquiry or supplier | Slack alert sent to `#pipeline-alerts` for human review |
+
+<Tip>
+  If you receive a Slack alert for an **uncertain** email, check the email and create the Twenty record manually if it turns out to be a real lead. The email is filed to the **Other** folder in the inbox so you can find it.
+</Tip>
+
+## How contacts are identified
+
+The automation handles several common email patterns automatically:
+
+- **Direct client emails** — the sender is identified as the client contact.
+- **Agency-forwarded briefs** — both the forwarding agent and the original client contact are extracted as separate Person records, each linked to their own company.
+- **Website form submissions (Wix)** — the real inquirer's details are extracted from the form fields in the email body, not from the notification sender address.
+- **Liberty International forwarded emails** — Liberty is Luxurique's sister brand. Emails relayed through Liberty are treated as if sent directly to Luxurique; the original external sender is identified as the contact.
+
+## Known limits to be aware of
+
+The automation does its best with every email, but a few situations require a manual follow-up in Twenty CRM:
+
+- **Contacts who email from a personal Gmail or similar address** with no company domain may not get a Person record created. The automation needs a domain to link a contact to a company.
+- **A found contact is not updated** — if a Person already exists in Twenty (matched by email address), the automation does not update their details, even if the new email has newer information. Update the record manually in Twenty if needed.
+- **PDF attachments over 2 MB, or non-PDF attachments**, are not read. If a client brief is in a large PDF or a Word document, the deal brief in Twenty may be incomplete. The deal record will include a note listing which files were not read.
+
+<Warning>
+  The automation never overwrites a value you have edited in Twenty. If you correct a misclassified contact or update a deal field, that value is yours — the next email on the same deal will not overwrite it.
+</Warning>
+
+## Correcting a wrong or missing record
+
+If a contact is missing, misclassified, or linked to the wrong company, the fix is simple:
+
+<Steps>
+  <Step title="Open Twenty CRM">
+    Go to [luxurique.twenty.com](https://luxurique.twenty.com).
+  </Step>
+  <Step title="Find or create the record">
+    Search for the Person, Company, or Deal. If it is missing entirely, create it manually using the **+** button in the relevant section.
+  </Step>
+  <Step title="Edit the fields you need to correct">
+    Update any incorrect fields — name, company link, deal stage, contact type, or anything else.
+  </Step>
+  <Step title="Save">
+    Your changes are permanent and will not be overwritten by any future automation run.
+  </Step>
+</Steps>
+
+## Slack notifications
+
+The email triage workflow sends two types of Slack notifications:
+
+- **`#sales-new-deals`** — a message for each new Deal created in Twenty, including the deal name, company, contact, and any PDF attachments that could not be read.
+- **`#pipeline-alerts`** — an alert for each email classified as **uncertain**, prompting someone to review it manually.
+
+If you stop seeing notifications in these channels, the n8n workflow may have encountered an error. See the [n8n Workflows](/crm/n8n-workflows) page for how to check.

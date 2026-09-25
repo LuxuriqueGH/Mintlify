@@ -1,23 +1,11 @@
 {
-  "$schema": "https://mintlify.com/docs.json",
-  "name": "Luxurique",
+  "projectType": "saas",
+  "projectName": "Luxurique",
+  "projectDescription": "An internal suite of tools for Luxurique staff to build, manage, and export luxury travel quotations — covering the QC Sheet (Excel workbook), QC Webapp (web replacement), and the surrounding CRM and analytics stack.",
   "theme": "willow",
-  "logo": {
-    "light": "https://media.brand.dev/5f428a61-3739-46c6-a953-1030f1ad6a79.png",
-    "dark": "https://media.brand.dev/5f428a61-3739-46c6-a953-1030f1ad6a79.png"
-  },
-  "favicon": "https://media.brand.dev/f3d5faf6-315a-48e7-a930-20b34efd8abe.png",
-  "colors": {
-    "primary": "#917c50",
-    "light": "#dcd4d4",
-    "dark": "#504d4d"
-  },
-  "navbar": {
-    "primary": {
-      "type": "github",
-      "href": "https://github.com/Luxurique"
-    }
-  },
+  "primaryColor": "#917c50",
+  "lightColor": "#dcd4d4",
+  "darkColor": "#504d4d",
   "navigation": {
     "tabs": [
       {
@@ -143,5 +131,32 @@
         ]
       }
     ]
-  }
+  },
+  "keyFeatures": [
+    "Multi-tab quotation and costing workbook (up to 30 quote sets per QC)",
+    "Category and label-based markup engine with per-QC rate overrides",
+    "Group and section organisation for structuring cost line items",
+    "Branded PDF, Word, and XLSX quotation export (Luxurique, Luxurique Travel, Liberty brands)",
+    "DailyView aggregated read-only summary across all active MainTables",
+    "QC Webapp: React SPA with Supabase backend, real-time collaboration, and undo/redo",
+    "Role-based access control (Project Lead, Sales Lead, Supervisor, Admin)",
+    "Microsoft Entra ID (M365) single sign-on for the webapp",
+    "Audit log and full change history with operation-level undo",
+    "Twenty CRM integration for deal linking and GRANDTOTAL push",
+    "n8n email triage and CRM upsert workflows",
+    "Preset.io (Apache Superset) BI dashboards over Supabase analytics",
+    "Vero email marketing integration with Supabase relay",
+    "Asana project-management integration (spec stage)"
+  ],
+  "publicApiSurface": [
+    "QC Sheet Ribbon: Export PDF (A4/A3), Export Word, Export XLSX, Update Quotation, Template selector",
+    "QC Sheet Ribbon: Add Tab, Delete Quote Set",
+    "QC Webapp: supabase-js client connecting to Postgres via RLS",
+    "QC Webapp RPCs: cell_edit, row_insert, row_delete, bulk_edit, paste_clone, move, section_op, tab_op, group_op, quote_op, concession_set",
+    "QC Webapp: Supabase Auth signInWithOAuth (Microsoft Entra ID)",
+    "Twenty CRM GraphQL /graphql (data) and /metadata (schema management)",
+    "Supabase Edge Function: twenty-webhook (HMAC-verified webhook ingestion)",
+    "Supabase Edge Function: vero-push (marketing sync to Vero)",
+    "Supabase Edge Function: vero-webhook / vero-processor (Vero → Twenty relay)"
+  ]
 }

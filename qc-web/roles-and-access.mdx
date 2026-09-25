@@ -1,0 +1,73 @@
+---
+title: "Roles and Project Access in the QC Webapp"
+sidebarTitle: "Roles & Access"
+description: "Five roles control what you can see and do in the QC Webapp. Project assignments then gate access to individual projects and QCs."
+---
+
+Access in the QC Webapp works in two layers. Your **global role** determines what actions you are allowed to perform across the system. **Project assignments** then determine which specific projects and QCs you can see. You need both: a role that permits an action, and an assignment that gives you visibility of the project it applies to.
+
+## The five roles
+
+| Role | Who it's for | What they can access |
+|---|---|---|
+| **None** | New accounts, offboarded staff | No access. Can sign in but sees no projects or QCs. |
+| **Project Lead (PL)** | Trip planners and coordinators assigned to specific deals | Projects and QCs they have been explicitly assigned to. |
+| **Sales Lead (SL)** | Sales staff | Automatically assigned to all projects; can be removed from individual projects. Can publish quotations, manage rates, and link/unlink CRM deals. |
+| **Supervisor** | Team leads and managers | Full read access to all projects and QCs by rule (no assignment needed). Access to administrative surfaces: MarkupMaster, system defaults, role grants, global column layouts. |
+| **Admin** | System administrators | Everything a Supervisor can do, plus the archive, Admin role grants and removals, and the history of destroyed projects and QCs. |
+
+<Note>
+  Supervisor and Admin access is rule-based and cannot be removed through the normal project assignment UI. Their access applies to every project and QC in the system at all times.
+</Note>
+
+## Project assignment scopes
+
+When a user (PL or SL) is assigned to a project, the assignment carries one of two **scopes** that control how much of the project they can see:
+
+- **All** — the user can see every QC in the project, including QCs created in the future.
+- **Conditional** — the user can only see specific QCs that have been individually granted to them via a QC-level assignment. New QCs created in the project are not visible by default until explicitly granted.
+
+When a new project is created, the creator and all current Sales Leads are automatically assigned with `scope = all`. An SL's auto-assignment can be removed or narrowed on a per-project basis.
+
+## Permissions at a glance
+
+| Action | PL | SL | Supervisor | Admin |
+|---|---|---|---|---|
+| View assigned projects and QCs | ✅ | ✅ | ✅ | ✅ |
+| Edit cost rows, create QCs, restore from history | ✅ | ✅ | ✅ | ✅ |
+| Create a project | ✅ | ✅ | ✅ | ✅ |
+| Markup overrides, per-QC rates, publish quotation, manage project members, CRM link/unlink | | ✅ | ✅ | ✅ |
+| MarkupMaster, system defaults, grant roles, global column layouts, view engine rules | | | ✅ | ✅ |
+| Upgrade a QC's pinned calculation engine version | | ✅ | ✅ | ✅ |
+| Permanently delete (move to archive) | ✅ (own QCs; projects with `all` scope) | ✅ | ✅ | ✅ |
+| View archive, unarchive items, destroy for good, full system admin | | | | ✅ |
+
+<Tip>
+  **SL+** means "Sales Lead or higher" — an action available to SL, Supervisor, and Admin. You will see this term used throughout the app's help text and audit log.
+</Tip>
+
+## How access is assigned and changed
+
+A Supervisor or Admin assigns roles from the **Admin → Users** screen. To assign project-level access, any SL or higher can manage the members list on the project page.
+
+The rule for assigning and removing access is:
+- **Assigning** a user to a project requires your role to outrank theirs.
+- **Removing** a user from a project requires your role to be equal to or higher than theirs.
+- **You can always remove your own assignment** from a project.
+
+## Offboarding a staff member
+
+When someone leaves Luxurique or no longer needs access to the QC Webapp:
+
+<Steps>
+  <Step title="Set the global role to None">
+    An Admin navigates to **Admin → Users**, finds the user, and sets their global role to **None**. This takes effect immediately — on their next request to the server they will receive no data.
+  </Step>
+  <Step title="Disable the Microsoft account (if applicable)">
+    Disabling the user's Luxurique M365 account prevents new sign-ins. However, because the QC Webapp reads the role from the database on every request rather than from the login token, setting the role to None in the app is the most immediate kill switch.
+  </Step>
+</Steps>
+
+<Warning>
+  Disabling an M365 account alone does not instantly revoke access to an active QC Webapp session — an existing session can continue refreshing until the role is set to None in the app. Always set the role to None as the primary offboarding step.
+</Warning>

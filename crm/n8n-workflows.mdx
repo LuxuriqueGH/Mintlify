@@ -1,0 +1,84 @@
+---
+title: "n8n Automation Workflows in the Luxurique Stack"
+sidebarTitle: "n8n Workflows"
+description: "n8n is the automation backbone that reads the M365 proxy inbox, classifies emails, and writes CRM records into Twenty. Runs on n8n Cloud."
+---
+
+n8n is the automation engine behind the Luxurique CRM stack. It runs on **n8n Cloud** and handles the work that would otherwise require manual data entry: reading inbound emails, extracting deal information, writing records into Twenty CRM, and alerting the team via Slack. You interact with its outputs — new deals in Twenty and Slack notifications — without ever needing to open the n8n interface in normal operation.
+
+## What n8n does in the Luxurique stack
+
+n8n is responsible for one primary pipeline: the **email triage and CRM capture workflow**. Every time an email arrives in the Luxurique shared inbox, this workflow runs automatically.
+
+The workflow steps, in order:
+
+<Steps>
+  <Step title="Read the proxy inbox">
+    n8n monitors a dedicated M365 proxy inbox that receives a copy of every email sent to the Luxurique contact address. The live, human-facing inbox is never touched.
+  </Step>
+  <Step title="Classify the email">
+    An LLM call (via OpenRouter) assigns each email to one category: **inquiry**, **supplier**, **junk**, or **uncertain**. Only genuine business inquiries proceed to the next steps.
+  </Step>
+  <Step title="Extract CRM fields">
+    Three parallel extraction calls pull structured data from the email: one for the **Person** (contact details), one for the **Company** (organisation), and one for the **Deal** (trip details, destinations, dates, passenger count).
+  </Step>
+  <Step title="Upsert records in Twenty CRM">
+    n8n writes the extracted data to Twenty CRM via GraphQL — creating a Person, Company, and Deal if they do not already exist. Existing records matched by email address or company domain are left untouched (automation never overwrites human edits).
+  </Step>
+  <Step title="Send Slack notifications">
+    A notification goes to **`#sales-new-deals`** for each new deal created, and to **`#pipeline-alerts`** for uncertain emails that need human review.
+  </Step>
+</Steps>
+
+## QC Webapp integration
+
+n8n also handles the push of quotation data back to Twenty when you export a quotation from the QC Webapp. When you export a completed quotation for a project that is linked to a Twenty deal, a Supabase edge function triggers n8n to update the deal with the grand total, gross cost, PAX count, and travel dates.
+
+This means your deal records in Twenty stay current with your latest costing figures automatically — no copy-paste required.
+
+<Note>
+  This QC-to-Twenty push only runs when a QC project is explicitly linked to a Twenty deal. If a deal is not showing updated costing figures, check that the project is linked in the QC Webapp.
+</Note>
+
+## What you see as a result
+
+As a staff member, n8n surfaces its work through two channels:
+
+<CardGroup cols={2}>
+  <Card title="Twenty CRM" icon="address-book">
+    New People, Companies, and Deals appear automatically, usually within a few minutes of an email arriving. Deal records include a structured brief, destinations, dates, and PAX where the email provided them.
+  </Card>
+  <Card title="Slack" icon="slack">
+    `#sales-new-deals` gets a notification for every new deal. `#pipeline-alerts` gets an alert for uncertain emails and for any extraction failures that need attention.
+  </Card>
+</CardGroup>
+
+## If automation stops working
+
+The workflow runs continuously and silently. If you notice that new emails are not producing CRM records, or Slack notifications have stopped:
+
+<Steps>
+  <Step title="Check #pipeline-alerts in Slack">
+    An extractor failure alert will appear here if the LLM extraction step failed (for example, if the AI service ran out of credits). This is the first place to look.
+  </Step>
+  <Step title="Check the n8n Cloud dashboard">
+    Open the n8n Cloud dashboard and look at recent executions for the **email-transform** workflow. A red execution indicates a failure. Click into it to see which step failed and what the error message says.
+  </Step>
+  <Step title="Contact the team">
+    If you cannot identify the cause from the dashboard, escalate to whoever manages the n8n configuration. Share the execution ID and the error message so they can investigate.
+  </Step>
+</Steps>
+
+<Warning>
+  Do not attempt to re-run failed executions yourself unless you have been trained on the n8n backfill process. Re-running an execution incorrectly can result in duplicate records in Twenty CRM, which require manual cleanup.
+</Warning>
+
+## Automation policy: create-only
+
+A key design principle of the n8n email workflow is that it is **create-only**. This means:
+
+- It creates new records in Twenty but **never updates existing ones**.
+- If an email matches a Person or Deal already in Twenty, automation skips the write and leaves the existing record unchanged.
+- Any field you have edited manually in Twenty is permanently yours — no automation run will overwrite it.
+
+This policy exists to protect the integrity of data that your team has curated. If a deal needs updating based on a follow-up email, the expected workflow is to review the email and update the deal manually in Twenty.

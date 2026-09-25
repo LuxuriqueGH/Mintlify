@@ -1,0 +1,63 @@
+---
+title: "Luxurique QC Sheet: Excel-Based Quotation & Costing"
+sidebarTitle: "Introduction"
+description: "The QC Sheet is Luxurique's Excel workbook for building, pricing, and exporting luxury travel quotations — used by Project Leads and Sales teams."
+---
+
+The QC Sheet (`QC-DEV.xlsb`) is Luxurique's central tool for building and pricing travel quotations. Project Leads, Sales Leads, and Supervisors use it to enter cost line items, apply markup rates, manage suppliers, and produce client-ready quotation documents — all from within a structured Excel workbook.
+
+## What the QC Sheet does
+
+Each workbook represents a single deal. Inside it you build one or more **quote sets** — independently priced scenarios for the same client — organise cost line items into sections, apply category-based markup rates, and then export the finished quotation as a PDF, Word document, or XLSX file.
+
+The QC Sheet is designed for three Luxurique brands. The brand context is set per quote set and drives which markup rates, labels, and quotation templates are applied:
+
+| Brand code | Brand name |
+|---|---|
+| **LUX** | Luxurique |
+| **LXT** | Luxurique Travel |
+| **LBT** | Liberty |
+
+## What it produces
+
+When a quote set is ready, the QC Sheet stages its data and lets you export in three formats:
+
+- **PDF** — for sending directly to clients
+- **Word (.docx)** — for further editing before sending
+- **XLSX** — for sharing a structured spreadsheet with stakeholders
+
+All exports are generated from the same underlying cost data, so pricing is always consistent across formats.
+
+## Key sheets at a glance
+
+| Sheet | What you use it for |
+|---|---|
+| **Tab 1 – Tab 30** | Building and editing individual quote sets |
+| **Overview** | Summary dashboard showing totals across all active quote sets |
+| **MarkupMaster** | Global category → label → markup rate matrix |
+| **DailyView** | Read-only roll-up of every line item across all quote sets |
+| **Tab Details** | Per-quote-set label and markup settings |
+
+<Note>
+Tab 0 is a hidden template used to generate new quote-set tabs. You will never work in it directly.
+</Note>
+
+## Explore the documentation
+
+<CardGroup cols={2}>
+  <Card title="Getting Started" icon="rocket" href="/qc-sheet/getting-started">
+    Open the workbook and create your first quote set.
+  </Card>
+  <Card title="Projects & Tabs" icon="folder-open" href="/qc-sheet/projects-and-tabs">
+    Understand how deals, quote sets, and tabs are organised.
+  </Card>
+  <Card title="Line Items" icon="list" href="/qc-sheet/line-items">
+    Add and edit individual cost rows in a quote set.
+  </Card>
+  <Card title="Groups & Sections" icon="layer-group" href="/qc-sheet/groups-and-sections">
+    Organise line items with sections and linked groups.
+  </Card>
+  <Card title="Markup & Pricing" icon="tags" href="/qc-sheet/markup-and-pricing">
+    Apply category-based markup rates and pricing overrides.
+  </Card>
+</CardGroup>

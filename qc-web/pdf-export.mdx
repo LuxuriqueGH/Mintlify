@@ -1,0 +1,71 @@
+---
+title: "Export a PDF Quotation from the QC Webapp"
+sidebarTitle: "PDF Export"
+description: "Generate draft or published PDF quotations from the QC Webapp, choosing paper size and understanding the difference between draft and published exports."
+---
+
+The QC Webapp lets you export any quotation as a PDF directly from your browser — no separate software required. Exports come in two types: **Draft** exports for internal preview and review, and **Published** exports that represent the official version sent to the client and stored permanently.
+
+## Before you export
+
+Make sure the quotation preview looks exactly as intended before generating a PDF. The export captures the live rendered state of the QC, including:
+
+- The column layout currently in force (your saved personal layout, the global default, or the code default — whichever applies to you)
+- All active rows, sections, and groups
+- Section subtotals, tab totals, and the fee footer
+- Brand-specific terms (determined by the brand set on the QC: LUX, LXT, or LBT)
+
+<Tip>
+  Open the **Quotation preview** screen before exporting to verify the layout and content. The preview is a live render of the same data the PDF will use, so what you see there is what you get in the file.
+</Tip>
+
+## Exporting a PDF
+
+<Steps>
+  <Step title="Open the QC and navigate to the export panel">
+    From inside the QC editor, click the **Export** or **Quotation preview** tab to open the export panel.
+  </Step>
+  <Step title="Choose your paper size">
+    Select **A4** (the default) or **A3** from the paper size options. A3 is useful for quotations with many columns or a wide layout.
+  </Step>
+  <Step title="Choose draft or published">
+    Select **Draft** if this export is for internal review. Select **Published** only when the quotation is ready to send to the client. See [Draft vs. published exports](#draft-vs-published-exports) below.
+  </Step>
+  <Step title="Generate the PDF">
+    Click **Export PDF**. The app renders the quotation using the browser's print engine and saves it as a PDF file. For draft exports, the file downloads to your machine. For published exports, the file is stored permanently and added to the QC's export history.
+  </Step>
+</Steps>
+
+## Draft vs. published exports
+
+<CardGroup cols={2}>
+  <Card title="Draft export" icon="file-pen">
+    For internal preview only. Downloads to your machine. Not stored in the system. Not sent to the client. You can generate as many draft exports as you need.
+  </Card>
+  <Card title="Published export" icon="paper-plane">
+    The official version sent to the client. Stored permanently. Freezes a checkpoint of the QC's history state. Immutable — it can never be overwritten.
+  </Card>
+</CardGroup>
+
+<Warning>
+  Publishing is irreversible. A published export is **immutable** — you cannot replace or delete it. If a correction is needed after publishing, make your edits to the QC and create a **new** published export. Both versions will remain in the export history.
+</Warning>
+
+## Column layout at export time
+
+The column layout that is active when you publish is **frozen with the published document**. This means the PDF always reflects exactly the columns that were visible at the time of publishing, regardless of any layout changes made to the QC afterwards. You can always open an older published export and see the exact layout it was produced with.
+
+<Note>
+  Only **SL and above** can publish a quotation. If you only have PL access, you can generate draft exports but you will need to ask an SL, Supervisor, or Admin to publish.
+</Note>
+
+## Export history
+
+All published exports for a QC are listed in the **export history** panel, each showing:
+
+- The date and time of publishing
+- Who published it
+- The paper size used
+- A link to download the stored PDF
+
+Draft exports do not appear in the export history.
